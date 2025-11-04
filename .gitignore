@@ -1,6 +1,5 @@
 evaluations/
 hdf5s/
-checkpoints/
 tb/
 statistics/
 logs/
