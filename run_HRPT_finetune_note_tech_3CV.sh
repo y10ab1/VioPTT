@@ -3,14 +3,14 @@
 
 # Modify to your workspace
 
-WORKSPACE="/home/yuehpo/coding/violin-mamba"
+WORKSPACE="/home/yuehpo/coding/VioPTT"
 
 # Notice:
 # 1. The checkpoints will be saved in this directory as `./checkpoints` under WORKSPACE
 # 2. Place dataset path under WORKSPACE, it should be {WORKSPACE}/hdf5s/mosa/...
 
 # Tensorboard log directory
-TB="/home/yuehpo/coding/violin-mamba/tb"
+TB="${WORKSPACE}/tb"
 
 # Piano Pretrained model path
 # PRETRAIN_PATH="/home/yuehpo/coding/violin-mamba/checkpoints/pretrained/high_resolution_MAESTRO_augmentations.pth"
@@ -36,7 +36,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --mosapt_hdf5s_dir /home/yuehpo/coding/violin-mamba/mosapt_notes \
+    --mosapt_hdf5s_dir ${WORKSPACE}/hdf5s/mosa/ \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -68,7 +68,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --mosapt_hdf5s_dir /home/yuehpo/coding/violin-mamba/mosapt_notes \
+    --mosapt_hdf5s_dir ${WORKSPACE}/hdf5s/mosa/ \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -106,7 +106,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --mosapt_hdf5s_dir /home/yuehpo/coding/violin-mamba/mosapt_notes \
+    --mosapt_hdf5s_dir ${WORKSPACE}/hdf5s/mosa/ \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -144,7 +144,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --mosapt_hdf5s_dir /home/yuehpo/coding/violin-mamba/mosapt_notes \
+    --mosapt_hdf5s_dir ${WORKSPACE}/hdf5s/mosa/ \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -184,7 +184,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --mosapt_hdf5s_dir /home/yuehpo/coding/violin-mamba/mosapt_notes \
+    --mosapt_hdf5s_dir ${WORKSPACE}/hdf5s/mosa/ \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -223,7 +223,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --mosapt_hdf5s_dir /home/yuehpo/coding/violin-mamba/mosapt_notes \
+    --mosapt_hdf5s_dir ${WORKSPACE}/hdf5s/mosa/ \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -248,4 +248,4 @@ echo "--------------------------------------------------------------------------
 echo ""
 
 
-grep -E "final_test|Done" /home/yuehpo/coding/violin-mamba/run_HRPT_finetune_note_tech_0915_3CV.log > /home/yuehpo/coding/violin-mamba/final_test_0915_3CV.txt
+grep -E "final_test|Done" ${WORKSPACE}/run_HRPT_finetune_note_tech_0915_3CV.log > ${WORKSPACE}/final_test_0915_3CV.txt

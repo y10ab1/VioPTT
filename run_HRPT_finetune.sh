@@ -3,21 +3,17 @@
 
 # Modify to your workspace
 
-WORKSPACE="/home/yuehpo/coding/violin-mamba"
+WORKSPACE="/home/yuehpo/coding/VioPTT"
 
 # Notice:
 # 1. The checkpoints will be saved in this directory as `./checkpoints` under WORKSPACE
 # 2. Place dataset path under WORKSPACE, it should be {WORKSPACE}/hdf5s/mosa/...
 
 # Tensorboard log directory
-TB="/home/yuehpo/coding/violin-mamba/tb"
+TB="${WORKSPACE}/tb"
 
-# Piano Pretrained model path
+# Piano Pretrained model path (uncomment to use)
 # PRETRAIN_PATH="/home/yuehpo/coding/violin-mamba/checkpoints/pretrained/high_resolution_MAESTRO_augmentations.pth"
-# Violin Pretrained model path
-# PRETRAIN_PATH="/home/yuehpo/coding/violin-mamba/checkpoints/main_contrast/w_aug_debug_from_scratch_contrast_weight_0.0_cosine_annealing_lr0724/Regress_onset_offset_frame_velocity_CRNN/loss_type=regress_onset_offset_frame_velocity_bce/augmentation=aug/max_note_shift=2/batch_size=5/10000_iterations.pth"
-# PRETRAIN_PATH="/home/yuehpo/coding/violin-mamba/checkpoints/main_contrast/w_aug_w_technique_annotation_mixed_dataset_new_ssv_local_technique_feature_10frames/Regress_onset_offset_frame_velocity_CRNN/loss_type=regress_onset_offset_frame_velocity_bce/augmentation=aug/max_note_shift=2/batch_size=5/8000_iterations.pth"
-PRETRAIN_PATH="/home/yuehpo/coding/violin-mamba/checkpoints/main_contrast/w_aug_w_technique_annotation_mixed_dataset_mosapt_ssv_local_technique_feature_10frames_volume_normalized_per_class_acc_0906/Regress_onset_offset_frame_velocity_CRNN/loss_type=regress_onset_offset_frame_velocity_bce/augmentation=aug/max_note_shift=2/batch_size=5/17000_iterations.pth"
 
 MODEL_TAG="w_aug_w_technique_annotation_mixed_dataset_mosapt_ssv_local_technique_feature_10frames_volume_normalized_per_class_acc_window_size30_0907"
 cd piano_transcription

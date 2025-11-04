@@ -3,7 +3,6 @@
 
 # Select inference model path
 # Model checkpoint path
-# CHECKPOINT_PATH="/home/yuehpo/coding/violin-mamba/checkpoints/main_contrast/w_aug_debug_from_scratch_contrast_weight_0.0_cosine_annealing_lr0724/Regress_onset_offset_frame_velocity_CRNN/loss_type=regress_onset_offset_frame_velocity_bce/augmentation=aug/max_note_shift=2/batch_size=5/10000_iterations.pth"
 WORKSPACE="/home/yuehpo/coding/VioPTT"
 
 CHECKPOINT_PATH="${WORKSPACE}/checkpoints/transcriptor_model.pth"
