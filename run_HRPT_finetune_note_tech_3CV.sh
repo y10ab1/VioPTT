@@ -12,14 +12,7 @@ WORKSPACE="/home/yuehpo/coding/VioPTT"
 # Tensorboard log directory
 TB="${WORKSPACE}/tb"
 
-# Piano Pretrained model path
-# PRETRAIN_PATH="/home/yuehpo/coding/violin-mamba/checkpoints/pretrained/high_resolution_MAESTRO_augmentations.pth"
-# Violin Pretrained model path
-# PRETRAIN_PATH="/home/yuehpo/coding/violin-mamba/checkpoints/main_contrast/w_aug_debug_from_scratch_contrast_weight_0.0_cosine_annealing_lr0724/Regress_onset_offset_frame_velocity_CRNN/loss_type=regress_onset_offset_frame_velocity_bce/augmentation=aug/max_note_shift=2/batch_size=5/10000_iterations.pth"
-# PRETRAIN_PATH="/home/yuehpo/coding/violin-mamba/checkpoints/main_contrast/w_aug_w_technique_annotation_mixed_dataset_mosapt_ssv_local_technique_feature_10frames_volume_normalized_per_class_acc_0906/Regress_onset_offset_frame_velocity_CRNN/loss_type=regress_onset_offset_frame_velocity_bce/augmentation=aug/max_note_shift=2/batch_size=5/17000_iterations.pth"
-PRETRAIN_PATH="/home/yuehpo/coding/violin-mamba/checkpoints/main_contrast/w_aug_debug_from_scratch_contrast_weight_0.0_cosine_annealing_lr0724/Regress_onset_offset_frame_velocity_CRNN/loss_type=regress_onset_offset_frame_velocity_bce/augmentation=aug/max_note_shift=2/batch_size=5/10000_iterations.pth"
-
-# PRETRAIN_PATH="/home/yuehpo/coding/violin-mamba/checkpoints/main_note_technique/note_level_tech_no_transcription_features_train_mosapt_test_rwc_0910/19000_iterations.pth"
+PRETRAIN_PATH="${WORKSPACE}/checkpoints/transcriptor_model.pth"
 
 cd piano_transcription
 
@@ -36,7 +29,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --mosapt_hdf5s_dir ${WORKSPACE}/hdf5s/mosa/ \
+    --rwc_notes_dir ${WORKSPACE}/rwc_notes/ \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -68,7 +61,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --mosapt_hdf5s_dir ${WORKSPACE}/hdf5s/mosa/ \
+    --rwc_notes_dir ${WORKSPACE}/rwc_notes/ \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -106,7 +99,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --mosapt_hdf5s_dir ${WORKSPACE}/hdf5s/mosa/ \
+    --rwc_notes_dir ${WORKSPACE}/rwc_notes/ \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -144,7 +137,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --mosapt_hdf5s_dir ${WORKSPACE}/hdf5s/mosa/ \
+    --rwc_notes_dir ${WORKSPACE}/rwc_notes/ \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -184,7 +177,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --mosapt_hdf5s_dir ${WORKSPACE}/hdf5s/mosa/ \
+    --rwc_notes_dir ${WORKSPACE}/rwc_notes/ \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -223,7 +216,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --mosapt_hdf5s_dir ${WORKSPACE}/hdf5s/mosa/ \
+    --rwc_notes_dir ${WORKSPACE}/rwc_notes/ \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \

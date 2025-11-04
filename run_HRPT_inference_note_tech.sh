@@ -2,8 +2,9 @@
 set -euo pipefail
 
 # ========== Configuration ==========
-
+# Modify to your workspace
 WORKSPACE="/home/yuehpo/coding/VioPTT"
+
 # Audio directory containing audio files (.wav, .mp3, .flac)
 AUDIO_DIR="/home/yuehpo/data/violin_transcription"
 

@@ -23,9 +23,9 @@ Raw per-fold CSV columns:
 
 Usage:
   python parse_final_test_3cv_to_csv.py \
-    --input /home/yuehpo/coding/violin-mamba/final_test_0915_3CV.txt \
-    --output /home/yuehpo/coding/violin-mamba/final_test_0915_3CV_summary.csv \
-    --raw-output /home/yuehpo/coding/violin-mamba/final_test_0915_3CV_raw.csv
+    --input VioPTT/final_test_0915_3CV.txt \
+    --output VioPTT/final_test_0915_3CV_summary.csv \
+    --raw-output VioPTT/final_test_0915_3CV_raw.csv
 """
 
 from __future__ import annotations

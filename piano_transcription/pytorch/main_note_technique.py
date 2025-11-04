@@ -59,7 +59,7 @@ def build_transcriptor(device, frames_per_second, classes_num, checkpoint_path):
 
 def train(args):
     workspace = args.workspace
-    notes_root = os.path.expanduser(args.rwc_notes_root)
+    notes_root = os.path.expanduser(args.rwc_notes_dir)
     logdir_root = os.path.join(args.logdir, args.model_tag)
     create_folder(logdir_root)
     writer = SummaryWriter(log_dir=logdir_root)
@@ -415,7 +415,7 @@ if __name__ == '__main__':
     parser.add_argument('--logdir', type=str, required=True)
     parser.add_argument('--model_tag', type=str, required=True)
     parser.add_argument('--augmentation', type=str, choices=['aug', 'no_aug'], default='aug')
-    parser.add_argument('--rwc_notes_root', type=str, default='/home/yuehpo/coding/violin-mamba/rwc_notes')
+    parser.add_argument('--rwc_notes_dir', type=str, default='PATH_TO_RWC_NOTES_DIR')
     parser.add_argument('--device', type=int, default=0)
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--learning_rate', type=float, default=3e-4)
@@ -427,7 +427,7 @@ if __name__ == '__main__':
     parser.add_argument('--pretrained_note_model_checkpoint', type=str, default=None)
     parser.add_argument('--fold_id', type=int, default=0)
     parser.add_argument('--dataset', type=str, choices=['rwc_note_wav', 'mosapt_note_h5', 'train_mosapt_test_rwc', 'train_mosapt_valid_rwc_test_rwc'], default='rwc_note_wav')
-    parser.add_argument('--mosapt_hdf5s_dir', type=str, default='/home/yuehpo/coding/violin-mamba/hdf5s/mosapt')
+    parser.add_argument('--mosapt_hdf5s_dir', type=str, default='PATH_TO_MOSAPT_HDF5S')
     parser.add_argument('--mosapt_train_ratio', type=float, default=0.9)
     parser.add_argument('--mosapt_split_seed', type=int, default=42)
     parser.add_argument('--mosapt_fixed_seconds', type=float, default=2.0)

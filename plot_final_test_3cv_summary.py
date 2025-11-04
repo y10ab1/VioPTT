@@ -9,8 +9,8 @@ Outputs PNG files for:
 
 Usage:
   python plot_final_test_3cv_summary.py \
-    --input /home/yuehpo/coding/violin-mamba/final_test_0915_3CV_summary.csv \
-    --out-dir /home/yuehpo/coding/violin-mamba/plots
+    --input VioPTT/final_test_0915_3CV_summary.csv \
+    --out-dir VioPTT/plots
 """
 
 from __future__ import annotations
