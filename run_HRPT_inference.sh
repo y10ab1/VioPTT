@@ -9,7 +9,7 @@ WORKSPACE="/home/yuehpo/coding/VioPTT"
 CHECKPOINT_PATH="${WORKSPACE}/checkpoints/transcriptor_model.pth"
 
 # Audio file path or directory that are going to be transcribed
-AUDIO_PATH="/home/yuehpo/data/violin_transcription"
+AUDIO_DIR="/home/yuehpo/data/violin_transcription"
 
 # Transcribed MIDI output directory
 OUTPUT_DIR="${WORKSPACE}/output/violin_transcription"
@@ -42,16 +42,16 @@ process_audio_file() {
     echo "----------------------------------------"
 }
 
-# Check if AUDIO_PATH is a directory or a file
-if [ -d "$AUDIO_PATH" ]; then
-    echo "Processing directory: $AUDIO_PATH"
+# Check if AUDIO_DIR is a directory or a file
+if [ -d "$AUDIO_DIR" ]; then
+    echo "Processing directory: $AUDIO_DIR"
     echo "Looking for .wav and .mp3 files..."
     
     # Find all .flac, .wav and .mp3 files in the directory (case insensitive)
-    audio_files=$(find "$AUDIO_PATH" -type f \( -iname "*.flac" -o -iname "*.wav" -o -iname "*.mp3" \))
+    audio_files=$(find "$AUDIO_DIR" -type f \( -iname "*.flac" -o -iname "*.wav" -o -iname "*.mp3" \))
     
     if [ -z "$audio_files" ]; then
-        echo "No .wav or .mp3 files found in directory: $AUDIO_PATH"
+        echo "No .wav or .mp3 files found in directory: $AUDIO_DIR"
         exit 1
     fi
     
@@ -70,11 +70,11 @@ if [ -d "$AUDIO_PATH" ]; then
     
     echo "All files processed successfully!"
     
-elif [ -f "$AUDIO_PATH" ]; then
-    echo "Processing single file: $AUDIO_PATH"
-    process_audio_file "$AUDIO_PATH"
+elif [ -f "$AUDIO_DIR" ]; then
+    echo "Processing single file: $AUDIO_DIR"
+    process_audio_file "$AUDIO_DIR"
     
 else
-    echo "Error: $AUDIO_PATH is neither a valid file nor directory"
+    echo "Error: $AUDIO_DIR is neither a valid file nor directory"
     exit 1
 fi

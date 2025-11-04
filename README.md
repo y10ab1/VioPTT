@@ -12,7 +12,7 @@ pip install -r requirements.txt
 ```bash
 # 1. Audio to MIDI
 # Convert audio files to MIDI format
-# Edit AUDIO_PATH, OUTPUT_DIR, and CHECKPOINT_PATH in the script before running
+# Edit AUDIO_DIR, OUTPUT_DIR, and CHECKPOINT_PATH in the script before running
 bash run_HRPT_inference.sh
 
 # 2. Recognize playing techniques for each note
@@ -26,7 +26,7 @@ bash run_HRPT_inference_PT_note.sh
   - Supports .wav, .mp3, .flac formats
   - Can process single file or entire directory
   - **Configuration required**: Edit the following variables at the top of the script:
-    - `AUDIO_PATH`: Path to audio file or directory
+    - `AUDIO_DIR`: Path to audio file or directory
     - `OUTPUT_DIR`: Output directory for MIDI files
     - `CHECKPOINT_PATH`: Path to transcription model checkpoint
   
