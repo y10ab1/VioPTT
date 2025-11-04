@@ -18,7 +18,7 @@ bash run_HRPT_inference.sh
 # 2. Recognize playing techniques for each note
 # Recognize playing techniques for each note based on audio and MIDI files
 # Edit AUDIO_DIR, MIDI_DIR, OUTPUT_DIR, and checkpoint paths in the script before running
-bash run_HRPT_inference_PT_note.sh
+bash run_HRPT_inference_note_tech.sh
 ```
 
 ### Description
@@ -30,7 +30,7 @@ bash run_HRPT_inference_PT_note.sh
     - `OUTPUT_DIR`: Output directory for MIDI files
     - `CHECKPOINT_PATH`: Path to transcription model checkpoint
   
-- **run_HRPT_inference_PT_note.sh**: Recognize playing techniques for each note
+- **run_HRPT_inference_note_tech.sh**: Recognize playing techniques for each note
   - Requires audio directory and corresponding MIDI directory
   - Outputs playing techniques for each note to CSV file
   - **Configuration required**: Edit the following variables at the top of the script:
