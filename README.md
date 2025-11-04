@@ -13,16 +13,16 @@ pip install -r requirements.txt
 # 1. Audio to MIDI
 # Convert audio files to MIDI format
 # Edit AUDIO_DIR, OUTPUT_DIR, and CHECKPOINT_PATH in the script before running
-bash run_HRPT_inference.sh
+bash scripts/run_HRPT_inference.sh
 
 # 2. Recognize playing techniques for each note
 # Recognize playing techniques for each note based on audio and MIDI files
 # Edit AUDIO_DIR, MIDI_DIR, OUTPUT_DIR, and checkpoint paths in the script before running
-bash run_HRPT_inference_note_tech.sh
+bash scripts/run_HRPT_inference_note_tech.sh
 ```
 
 ### Description
-- **run_HRPT_inference.sh**: Convert audio files to MIDI format
+- **scripts/run_HRPT_inference.sh**: Convert audio files to MIDI format
   - Supports .wav, .mp3, .flac formats
   - Can process single file or entire directory
   - **Configuration required**: Edit the following variables at the top of the script:
@@ -30,7 +30,7 @@ bash run_HRPT_inference_note_tech.sh
     - `OUTPUT_DIR`: Output directory for MIDI files
     - `CHECKPOINT_PATH`: Path to transcription model checkpoint
   
-- **run_HRPT_inference_note_tech.sh**: Recognize playing techniques for each note
+- **scripts/run_HRPT_inference_note_tech.sh**: Recognize playing techniques for each note
   - Requires audio directory and corresponding MIDI directory
   - Outputs playing techniques for each note to CSV file
   - **Configuration required**: Edit the following variables at the top of the script:

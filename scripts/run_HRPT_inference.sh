@@ -1,14 +1,18 @@
+#!/bin/bash
+
+# Auto-detect project root directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+WORKSPACE="${PROJECT_ROOT}"
 
 # Inference High Resolution Piano Transcription (HRPT)
 
 # Select inference model path
 # Model checkpoint path
-WORKSPACE="/home/yuehpo/coding/VioPTT"
-
 CHECKPOINT_PATH="${WORKSPACE}/checkpoints/transcriptor_model.pth"
 
 # Audio file path or directory that are going to be transcribed
-AUDIO_DIR="/home/yuehpo/data/violin_transcription"
+AUDIO_DIR="${WORKSPACE}/data/violin_transcription"
 
 # Transcribed MIDI output directory
 OUTPUT_DIR="${WORKSPACE}/output/violin_transcription"
@@ -23,7 +27,7 @@ POST_PROCESSOR_TYPE="regression"  # Don't need to change
 
 
 
-cd piano_transcription
+cd "${WORKSPACE}/piano_transcription"
 
 # Function to process a single audio file
 process_audio_file() {
@@ -77,3 +81,4 @@ else
     echo "Error: $AUDIO_DIR is neither a valid file nor directory"
     exit 1
 fi
+

@@ -1,9 +1,11 @@
+#!/bin/bash
+
+# Auto-detect project root directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+WORKSPACE="${PROJECT_ROOT}"
 
 # Training High Resolution Piano Transcription (HRPT)
-
-# Modify to your workspace
-
-WORKSPACE="/home/yuehpo/coding/VioPTT"
 
 # Notice:
 # 1. The checkpoints will be saved in this directory as `./checkpoints` under WORKSPACE
@@ -11,10 +13,10 @@ WORKSPACE="/home/yuehpo/coding/VioPTT"
 
 # Tensorboard log directory
 TB="${WORKSPACE}/tb"
-
+RWC_NOTES_DIR="${WORKSPACE}/data/rwc_notes/"
 PRETRAIN_PATH="${WORKSPACE}/checkpoints/transcriptor_model.pth"
 
-cd piano_transcription
+cd "${WORKSPACE}/piano_transcription"
 
 TODAY_DATE="0915"
 EARLY_STOP=1000
@@ -29,7 +31,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --rwc_notes_dir ${WORKSPACE}/rwc_notes/ \
+    --rwc_notes_dir ${RWC_NOTES_DIR} \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -61,7 +63,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --rwc_notes_dir ${WORKSPACE}/rwc_notes/ \
+    --rwc_notes_dir ${RWC_NOTES_DIR} \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -99,7 +101,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --rwc_notes_dir ${WORKSPACE}/rwc_notes/ \
+    --rwc_notes_dir ${RWC_NOTES_DIR} \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -137,7 +139,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --rwc_notes_dir ${WORKSPACE}/rwc_notes/ \
+    --rwc_notes_dir ${RWC_NOTES_DIR} \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -177,7 +179,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --rwc_notes_dir ${WORKSPACE}/rwc_notes/ \
+    --rwc_notes_dir ${RWC_NOTES_DIR} \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -216,7 +218,7 @@ do
     --logdir $TB \
     --model_tag $MODEL_TAG \
     --augmentation 'aug' \
-    --rwc_notes_dir ${WORKSPACE}/rwc_notes/ \
+    --rwc_notes_dir ${RWC_NOTES_DIR} \
     --device 0 \
     --batch_size 128 \
     --learning_rate 5e-4 \
@@ -242,3 +244,4 @@ echo ""
 
 
 grep -E "final_test|Done" ${WORKSPACE}/run_HRPT_finetune_note_tech_0915_3CV.log > ${WORKSPACE}/final_test_0915_3CV.txt
+

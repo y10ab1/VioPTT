@@ -1,9 +1,11 @@
+#!/bin/bash
+
+# Auto-detect project root directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+WORKSPACE="${PROJECT_ROOT}"
 
 # Training High Resolution Piano Transcription (HRPT)
-
-# Modify to your workspace
-
-WORKSPACE="/home/yuehpo/coding/VioPTT"
 
 # Notice:
 # 1. The checkpoints will be saved in this directory as `./checkpoints` under WORKSPACE
@@ -13,10 +15,10 @@ WORKSPACE="/home/yuehpo/coding/VioPTT"
 TB="${WORKSPACE}/tb"
 
 # Piano Pretrained model path (uncomment to use)
-# PRETRAIN_PATH="/home/yuehpo/coding/violin-mamba/checkpoints/pretrained/high_resolution_MAESTRO_augmentations.pth"
+# PRETRAIN_PATH="${WORKSPACE}/checkpoints/pretrained/high_resolution_MAESTRO_augmentations.pth"
 
 MODEL_TAG="w_aug_w_technique_annotation_mixed_dataset_mosapt_ssv_local_technique_feature_10frames_volume_normalized_per_class_acc_window_size30_0907"
-cd piano_transcription
+cd "${WORKSPACE}/piano_transcription"
 # --- 1. Train note transcription system ---
 python3 pytorch/main_contrast.py train \
     --workspace=$WORKSPACE \
@@ -37,3 +39,4 @@ python3 pytorch/main_contrast.py train \
     --ctc_weight=0.0 \
     --technique_weight=1.0 
     # --pretrain_path=$PRETRAIN_PATH 
+

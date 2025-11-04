@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ========== Configuration ==========
-# Modify to your workspace
-WORKSPACE="/home/yuehpo/coding/VioPTT"
+# Auto-detect project root directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+WORKSPACE="${PROJECT_ROOT}"
 
+# ========== Configuration ==========
 # Audio directory containing audio files (.wav, .mp3, .flac)
-AUDIO_DIR="/home/yuehpo/data/violin_transcription"
+AUDIO_DIR="${WORKSPACE}/data/violin_transcription"
 
 # MIDI directory containing corresponding MIDI files (.mid, .midi)
 MIDI_DIR="${WORKSPACE}/output/violin_transcription"
@@ -107,7 +109,7 @@ for BASENAME in "${!AUDIO_MAP[@]}"; do
     OUTPUT_CSV="$OUTPUT_DIR/${BASENAME}_techniques.csv"
 
     echo "Processing: $BASENAME"
-    python /home/yuehpo/coding/VioPTT/piano_transcription/pytorch/infer_note_technique_from_midi.py \
+    python "${WORKSPACE}/piano_transcription/pytorch/infer_note_technique_from_midi.py" \
       --audio_path "$AUDIO_PATH" \
       --midi_path "$MIDI_PATH" \
       --note_model_checkpoint "$NOTE_MODEL_CHECKPOINT" \
@@ -126,3 +128,4 @@ if [[ $COUNT -eq 0 ]]; then
   echo "  AUDIO_DIR=$AUDIO_DIR"
   echo "  MIDI_DIR=$MIDI_DIR"
 fi
+

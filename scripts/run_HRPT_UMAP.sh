@@ -1,5 +1,11 @@
-WORKSPACE="/home/yuehpo/coding/VioPTT"
-# CHECKPOINT_PATH="/home/yuehpo/coding/violin-mamba/checkpoints/main_note_technique/note_level_tech_no_transcription_features_fold_2_0915_3CV_with_transcription_features_all/660_iterations.pth"
+#!/bin/bash
+
+# Auto-detect project root directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+WORKSPACE="${PROJECT_ROOT}"
+
+# CHECKPOINT_PATH="${WORKSPACE}/checkpoints/main_note_technique/note_level_tech_no_transcription_features_fold_2_0915_3CV_with_transcription_features_all/660_iterations.pth"
 TRANSCRIPTOR_CHECKPOINT_PATH="${WORKSPACE}/checkpoints/transcriptor_model.pth"
 
 
@@ -18,3 +24,4 @@ python ${WORKSPACE}/piano_transcription/pytorch/visualize_umap_note_technique_3f
   --ignore_confusion_class no_technique \
   --n_neighbors 10 --min_dist 0.05 \
   --out_dir ${WORKSPACE}/umap
+
