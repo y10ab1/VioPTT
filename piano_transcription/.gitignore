@@ -1,0 +1,10 @@
+*
+!*/
+!*.*
+*.hdf5
+*.pyc
+__pycache__
+resources/
+paper/
+results/
+evaluations/
