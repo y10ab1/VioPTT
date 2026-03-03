@@ -97,15 +97,16 @@ class PianoTranscription(object):
         
         # Deframe to original length
         for key in output_dict.keys():
-            output_dict[key] = self.deframe(output_dict[key])[0 : audio_len]
+            frames_num = int(round(audio_len * self.frames_per_second / config.sample_rate))
+            output_dict[key] = self.deframe(output_dict[key])[0 : frames_num]
         """output_dict: {
-          'reg_onset_output': (segment_frames, classes_num), 
-          'reg_offset_output': (segment_frames, classes_num), 
-          'frame_output': (segment_frames, classes_num), 
-          'velocity_output': (segment_frames, classes_num), 
-          'reg_pedal_onset_output': (segment_frames, 1), 
-          'reg_pedal_offset_output': (segment_frames, 1), 
-          'pedal_frame_output': (segment_frames, 1)}"""
+          'reg_onset_output': (frames_num, classes_num), 
+          'reg_offset_output': (frames_num, classes_num), 
+          'frame_output': (frames_num, classes_num), 
+          'velocity_output': (frames_num, classes_num), 
+          'reg_pedal_onset_output': (frames_num, 1), 
+          'reg_pedal_offset_output': (frames_num, 1), 
+          'pedal_frame_output': (frames_num, 1)}"""
         
         # print(f"output_dict keys: {output_dict.keys()}") # ['reg_onset_output', 'reg_offset_output', 'frame_output', 'velocity_output', 'onset_output', 'onset_shift_output', 'offset_output', 'offset_shift_output']
         # print(f"output_dict reg_onset_output shape: {output_dict['reg_onset_output'].shape}") # (14000, 88)
@@ -238,6 +239,10 @@ def inference(args):
     # Load audio
     # print(f"sample rate: {sample_rate}")
     (audio, _) = load_audio(audio_path, sr=sample_rate, mono=True)
+
+    # Normalize audio before transcription
+    if audio.size > 0:
+        audio = audio / (np.max(np.abs(audio)) + 1e-8)
 
     # Transcriptor
     transcriptor = PianoTranscription(model_type, device=device, 

@@ -232,3 +232,57 @@ def get_ref_note_events_urmp(note_path):
     ref_pitches = np.array(pitches)
     ref_velocities = np.array(velocities)
     return ref_on_off_pairs, ref_pitches, ref_velocities
+
+
+def get_song_folders_mosapt(prefix='ba3'):
+    """Get song folders for MOSAPT dataset from HDF5 files."""
+    hdf5s_dir = "/home/yuehpo/coding/VioPTT/data/hdf5s/mosapt_ssv_4"
+    song_folders = []
+
+    for item in os.listdir(hdf5s_dir):
+        if item.startswith(prefix) and item.endswith('.h5'):
+            item_path = os.path.join(hdf5s_dir, item)
+            song_name = os.path.splitext(item)[0]
+
+            song_folders.append({
+                'song_name': song_name,
+                'audio_path': item_path,  # Use H5 path as audio_path
+                'midi_path': item_path,   # Use H5 path as midi_path
+                'align_path': None
+            })
+
+    return song_folders
+
+
+def get_ref_note_events_mosapt(h5_path):
+    """Extract reference note events from MOSAPT HDF5 file."""
+    import h5py
+    from utilities import TargetProcessor
+    import config
+
+    with h5py.File(h5_path, 'r') as hf:
+        midi_events = [e.decode() if isinstance(e, bytes) else e for e in hf['midi_event'][:]]
+        midi_times = hf['midi_event_time'][:]
+
+        # Determine duration
+        if 'duration' in hf.attrs:
+            duration_sec = float(hf.attrs['duration'])
+        else:
+            sample_rate = config.sample_rate
+            duration_sec = len(hf['waveform']) / sample_rate
+
+        tp = TargetProcessor(
+            segment_seconds=duration_sec,
+            frames_per_second=config.frames_per_second,
+            begin_note=config.begin_note,
+            classes_num=config.classes_num
+        )
+
+        # Process MIDI events to get note events
+        _, note_events, _ = tp.process(0.0, midi_times, midi_events, extend_pedal=True)
+
+        ref_on_off_pairs = np.array([[event['onset_time'], event['offset_time']] for event in note_events])
+        ref_midi_notes = np.array([event['midi_note'] for event in note_events])
+        ref_velocities = np.array([event['velocity'] for event in note_events])
+
+    return ref_on_off_pairs, ref_midi_notes, ref_velocities

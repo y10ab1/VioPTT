@@ -12,10 +12,10 @@ WORKSPACE="${PROJECT_ROOT}"
 CHECKPOINT_PATH="${WORKSPACE}/checkpoints/transcriptor_model.pth"
 
 # Audio file path or directory that are going to be transcribed
-AUDIO_DIR="${WORKSPACE}/data/violin_transcription"
+AUDIO_DIR="${WORKSPACE}/data/rwc_full_tracks"
 
 # Transcribed MIDI output directory
-OUTPUT_DIR="${WORKSPACE}/output/violin_transcription"
+OUTPUT_DIR="${WORKSPACE}/output/rwc_full_tracks"
 
 # Model type
 MODEL_TYPE="Regress_onset_offset_frame_velocity_CRNN" # Don't need to change
