@@ -323,22 +323,32 @@
       🔊 Use headphones or quality speakers for the best listening experience.
     </div>
 
-    <h3>Full-Piece Transcription</h3>
+    <h3>MOSA-VPT Synthetic Dataset Samples</h3>
     <p>
-      URMP — <em>Jesus, Joy of Man's Desiring</em> (violin), 30-second excerpt.
-      The piano track is synthesized directly from the MIDI output of VioPTT's transcription module.
+      Samples from our synthetic <strong>MOSA-VPT</strong> dataset — violin audio rendered from MOSA MIDI scores
+      using a professional virtual violin instrument (Synchron Solo Violin I) via DAWDreamer.
+      Each track is a 30-second excerpt rendered with a different playing technique.
+      The dataset contains 76 hours of audio across four techniques.
     </p>
     <div class="audio-table-wrap">
       <table>
-        <thead><tr><th></th><th>Audio (30s excerpt)</th></tr></thead>
+        <thead><tr><th>Technique</th><th>Synthetic Violin Audio (30s)</th></tr></thead>
         <tbody>
           <tr>
-            <td class="label-cell">🎻 Original Violin</td>
-            <td><audio controls src="audio/jesus_violin.mp3"></audio></td>
+            <td class="label-cell"><span class="tech"><span class="dot dot-flageolet"></span>Flageolet</span></td>
+            <td><audio controls src="audio/mosapt_flageolet.mp3"></audio></td>
           </tr>
           <tr>
-            <td class="label-cell">🎹 Transcribed (Piano)</td>
-            <td><audio controls src="audio/jesus_piano.mp3"></audio></td>
+            <td class="label-cell"><span class="tech"><span class="dot dot-detache"></span>Détaché</span></td>
+            <td><audio controls src="audio/mosapt_normal.mp3"></audio></td>
+          </tr>
+          <tr>
+            <td class="label-cell"><span class="tech"><span class="dot dot-pizzicato"></span>Pizzicato</span></td>
+            <td><audio controls src="audio/mosapt_pizzicato.mp3"></audio></td>
+          </tr>
+          <tr>
+            <td class="label-cell"><span class="tech"><span class="dot dot-spiccato"></span>Spiccato</span></td>
+            <td><audio controls src="audio/mosapt_spiccato.mp3"></audio></td>
           </tr>
         </tbody>
       </table>
