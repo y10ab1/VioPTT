@@ -194,7 +194,7 @@
 <!-- ═══════════════════ HEADER ═══════════════════ -->
 <header>
   <h1>VioPTT: Violin Playing Technique-Aware<br>Transcription from Synthetic Data Augmentation</h1>
-  <div class="venue">arXiv 2509.23759</div>
+  <div class="venue">ICASSP 2026</div>
   <p class="authors">
     Ting-Kang Wang<sup>*2,3,1</sup> &nbsp;&nbsp;&nbsp;
     Yueh-Po Peng<sup>*4,1</sup> &nbsp;&nbsp;&nbsp;
@@ -320,85 +320,56 @@
   <section id="audio-examples">
     <h2>Audio Examples</h2>
     <p>
-      Each row shows a single-note violin audio excerpt and the technique predicted by VioPTT.
-      Ground-truth technique labels are from the <strong>RWC Musical Instrument Sound Database</strong>.
+      Each example shows a violin chromatic scale from the <strong>RWC Musical Instrument Sound Database</strong>,
+      paired with its piano-synthesized transcription output. The <em>Technique Accuracy</em> column indicates
+      the fraction of notes correctly labelled by VioPTT.
     </p>
     <div class="note">
       🔊 Use headphones or quality speakers for the best listening experience.
-      Audio samples will be added here.
     </div>
 
-    <h3>Flageolet</h3>
-    <div class="audio-table-wrap">
+    <div class="audio-table-wrap" style="margin-top:1.5rem">
       <table>
-        <thead><tr><th>Sample</th><th>Input Audio</th><th>Predicted</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Technique</th>
+            <th>🎻 Violin Input</th>
+            <th>🎹 Transcribed (Piano)</th>
+            <th>Technique Accuracy</th>
+          </tr>
+        </thead>
         <tbody>
           <tr>
-            <td class="label-cell">Sample 1</td>
-            <td><audio controls src="audio/flageolet_1.wav"></audio></td>
-            <td><span class="tech"><span class="dot dot-flageolet"></span>Flageolet</span></td>
+            <td class="label-cell">
+              <span class="tech"><span class="dot dot-flageolet"></span>Flageolet</span>
+            </td>
+            <td><audio controls src="audio/flageolet_violin.mp3"></audio></td>
+            <td><audio controls src="audio/flageolet_piano.mp3"></audio></td>
+            <td>3 / 6 <small style="color:var(--muted)">(50%)</small></td>
           </tr>
           <tr>
-            <td class="label-cell">Sample 2</td>
-            <td><audio controls src="audio/flageolet_2.wav"></audio></td>
-            <td><span class="tech"><span class="dot dot-flageolet"></span>Flageolet</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h3>Détaché</h3>
-    <div class="audio-table-wrap">
-      <table>
-        <thead><tr><th>Sample</th><th>Input Audio</th><th>Predicted</th></tr></thead>
-        <tbody>
-          <tr>
-            <td class="label-cell">Sample 1</td>
-            <td><audio controls src="audio/detache_1.wav"></audio></td>
-            <td><span class="tech"><span class="dot dot-detache"></span>Détaché</span></td>
+            <td class="label-cell">
+              <span class="tech"><span class="dot dot-detache"></span>Détaché</span>
+            </td>
+            <td><audio controls src="audio/normal_violin.mp3"></audio></td>
+            <td><audio controls src="audio/normal_piano.mp3"></audio></td>
+            <td>54 / 54 <small style="color:#10b981">(100%)</small></td>
           </tr>
           <tr>
-            <td class="label-cell">Sample 2</td>
-            <td><audio controls src="audio/detache_2.wav"></audio></td>
-            <td><span class="tech"><span class="dot dot-detache"></span>Détaché</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h3>Pizzicato</h3>
-    <div class="audio-table-wrap">
-      <table>
-        <thead><tr><th>Sample</th><th>Input Audio</th><th>Predicted</th></tr></thead>
-        <tbody>
-          <tr>
-            <td class="label-cell">Sample 1</td>
-            <td><audio controls src="audio/pizzicato_1.wav"></audio></td>
-            <td><span class="tech"><span class="dot dot-pizzicato"></span>Pizzicato</span></td>
+            <td class="label-cell">
+              <span class="tech"><span class="dot dot-pizzicato"></span>Pizzicato</span>
+            </td>
+            <td><audio controls src="audio/pizzicato_violin.mp3"></audio></td>
+            <td><audio controls src="audio/pizzicato_piano.mp3"></audio></td>
+            <td>15 / 16 <small style="color:#10b981">(94%)</small></td>
           </tr>
           <tr>
-            <td class="label-cell">Sample 2</td>
-            <td><audio controls src="audio/pizzicato_2.wav"></audio></td>
-            <td><span class="tech"><span class="dot dot-pizzicato"></span>Pizzicato</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h3>Spiccato</h3>
-    <div class="audio-table-wrap">
-      <table>
-        <thead><tr><th>Sample</th><th>Input Audio</th><th>Predicted</th></tr></thead>
-        <tbody>
-          <tr>
-            <td class="label-cell">Sample 1</td>
-            <td><audio controls src="audio/spiccato_1.wav"></audio></td>
-            <td><span class="tech"><span class="dot dot-spiccato"></span>Spiccato</span></td>
-          </tr>
-          <tr>
-            <td class="label-cell">Sample 2</td>
-            <td><audio controls src="audio/spiccato_2.wav"></audio></td>
-            <td><span class="tech"><span class="dot dot-spiccato"></span>Spiccato</span></td>
+            <td class="label-cell">
+              <span class="tech"><span class="dot dot-spiccato"></span>Spiccato</span>
+            </td>
+            <td><audio controls src="audio/spiccato_violin.mp3"></audio></td>
+            <td><audio controls src="audio/spiccato_piano.mp3"></audio></td>
+            <td>45 / 53 <small style="color:#10b981">(85%)</small></td>
           </tr>
         </tbody>
       </table>
