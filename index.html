@@ -32,19 +32,28 @@
       text-align: center;
     }
     header h1 {
-      font-size: clamp(1.6rem, 4vw, 2.6rem);
+      font-size: clamp(1.5rem, 3.8vw, 2.4rem);
       font-weight: 700;
       line-height: 1.25;
       margin-bottom: 0.5rem;
     }
-    header .subtitle {
-      font-size: 1.05rem;
-      opacity: 0.85;
-      margin-bottom: 1.4rem;
+    header .venue {
+      font-size: 0.95rem;
+      font-weight: 600;
+      background: rgba(255,255,255,0.18);
+      display: inline-block;
+      padding: 0.2rem 0.85rem;
+      border-radius: 999px;
+      margin-bottom: 1rem;
     }
     header .authors {
-      font-size: 0.95rem;
-      opacity: 0.75;
+      font-size: 1rem;
+      opacity: 0.92;
+      margin-bottom: 0.3rem;
+    }
+    header .affiliations {
+      font-size: 0.82rem;
+      opacity: 0.65;
       margin-bottom: 1.6rem;
     }
     .btn-group { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
@@ -64,7 +73,7 @@
     .btn-secondary { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.4); }
 
     /* ── Main ── */
-    main { max-width: 900px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+    main { max-width: 920px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
 
     section { margin-bottom: 3rem; }
     h2 {
@@ -75,7 +84,7 @@
       padding-bottom: 0.4rem;
       border-bottom: 2px solid var(--accent);
     }
-    h3 { font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    h3 { font-size: 1.0rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 
     p { margin-bottom: 0.8rem; color: #334155; }
 
@@ -91,10 +100,10 @@
       border: 1px solid #bfdbfe;
     }
 
-    /* ── Method figure ── */
+    /* ── Method steps ── */
     .method-steps {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 1rem;
       margin-top: 1.2rem;
     }
@@ -123,28 +132,34 @@
     thead tr { background: var(--accent); color: #fff; }
     thead th { padding: 0.65rem 0.8rem; text-align: center; font-weight: 600; white-space: nowrap; }
     tbody tr:nth-child(even) { background: var(--card-bg); }
-    tbody td { padding: 0.65rem 0.8rem; text-align: center; vertical-align: middle; border-bottom: 1px solid var(--border); }
-    tbody td.label-cell { font-weight: 600; text-align: left; }
+    tbody td {
+      padding: 0.65rem 0.8rem;
+      text-align: center;
+      vertical-align: middle;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody td.label-cell { font-weight: 600; text-align: left; white-space: nowrap; }
 
     audio { width: 100%; min-width: 130px; }
 
     /* technique colour dots */
     .tech { display: inline-flex; align-items: center; gap: 0.35rem; }
     .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-    .dot-flageolet  { background: #8b5cf6; }
-    .dot-normal     { background: #10b981; }
-    .dot-pizzicato  { background: #f59e0b; }
-    .dot-spiccato   { background: #ef4444; }
+    .dot-flageolet { background: #8b5cf6; }
+    .dot-detache   { background: #10b981; }
+    .dot-pizzicato { background: #f59e0b; }
+    .dot-spiccato  { background: #ef4444; }
 
-    /* ── Metrics table ── */
-    .metrics-table { width: auto; margin-top: 1rem; }
-    .metrics-table thead tr { background: #1e3a5f; }
-    .metrics-table td, .metrics-table th { padding: 0.55rem 1.2rem; }
-    .metrics-table td { text-align: center; }
-    .metrics-table td:first-child { text-align: left; font-weight: 600; }
-    .best { color: var(--accent); font-weight: 700; }
+    /* ── Results tables ── */
+    .results-table thead tr { background: #1e3a5f; }
+    .results-table td, .results-table th { padding: 0.55rem 0.75rem; }
+    .results-table td { text-align: center; }
+    .results-table td:first-child { text-align: left; white-space: nowrap; }
+    .best { color: #fff; background: var(--accent) !important; font-weight: 700; }
+    .second { font-weight: 600; text-decoration: underline; }
+    .separator td { background: #f1f5f9 !important; font-style: italic; font-size: 0.8rem; color: var(--muted); }
 
-    /* ── Note ── */
+    /* ── Note box ── */
     .note {
       background: var(--accent-light);
       border-left: 4px solid var(--accent);
@@ -171,40 +186,62 @@
 </head>
 <body>
 
-<!-- ═══════════════════════════ HEADER ═══════════════════════════ -->
+<!-- ═══════════════════ HEADER ═══════════════════ -->
 <header>
-  <h1>VioPTT: Violin Technique-Aware<br>Piano Transcription with Synthetic Data</h1>
-  <p class="subtitle">Automatic transcription and per-note playing technique classification for violin</p>
-  <p class="authors">Yueh-Po Peng &nbsp;·&nbsp; Academia Sinica</p>
+  <h1>VioPTT: Violin Playing Technique-Aware<br>Transcription from Synthetic Data Augmentation</h1>
+  <div class="venue">arXiv 2509.23759</div>
+  <p class="authors">
+    Ting-Kang Wang<sup>*</sup> &nbsp;&nbsp;
+    Yueh-Po Peng<sup>*</sup> &nbsp;&nbsp;
+    Li Su &nbsp;&nbsp;
+    Vincent K.M. Cheung
+  </p>
+  <p class="affiliations">
+    Sony Computer Science Laboratories, Inc. &nbsp;·&nbsp;
+    Academia Sinica &nbsp;·&nbsp;
+    National Taiwan University &nbsp;·&nbsp;
+    Gamania Inc.<br>
+    <small><sup>*</sup> Equal contribution</small>
+  </p>
   <div class="btn-group">
+    <a class="btn btn-primary" href="https://arxiv.org/abs/2509.23759" target="_blank">
+      📄 Paper
+    </a>
     <a class="btn btn-primary" href="https://github.com/y10ab1/VioPTT" target="_blank">
       <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-      GitHub
+      Code
     </a>
-    <a class="btn btn-secondary" href="#audio-examples">Audio Examples</a>
-    <a class="btn btn-secondary" href="#results">Results</a>
+    <a class="btn btn-secondary" href="https://doi.org/10.5281/zenodo.18295471" target="_blank">
+      🗃️ MOSA-VPT Dataset
+    </a>
+    <a class="btn btn-secondary" href="#audio-examples">🔊 Audio Examples</a>
+    <a class="btn btn-secondary" href="#results">📊 Results</a>
   </div>
 </header>
 
-<!-- ═══════════════════════════ MAIN ═══════════════════════════ -->
+<!-- ═══════════════════ MAIN ═══════════════════ -->
 <main>
 
   <!-- Abstract -->
   <section id="abstract">
     <h2>Abstract</h2>
     <p>
-      We present <strong>VioPTT</strong>, a system for automatic violin transcription with per-note playing technique classification.
-      Given a raw violin audio recording, VioPTT outputs a MIDI transcription and labels each note with one of four playing techniques:
-      <strong>flageolet</strong>, <strong>normal</strong>, <strong>pizzicato</strong>, and <strong>spiccato</strong>.
+      While automatic music transcription is well-established in music information retrieval, most models are limited to
+      transcribing pitch and timing information from audio, and thus omit crucial expressive and instrument-specific nuances.
+      One example is playing technique on the violin, which affords its distinct palette of timbres for maximal emotional impact.
     </p>
     <p>
-      Our approach leverages synthetic data augmentation to bridge the gap between limited annotated data and the diversity of real-world
-      violin recordings. A pretrained piano transcription model provides intermediate representations (onset, offset, frame, and velocity activations)
-      that serve as rich acoustic features for technique classification.
+      Here, we propose <strong>VioPTT</strong> (Violin Playing Technique-aware Transcription), a lightweight cascade model that
+      directly transcribes violin playing technique in addition to pitch onset and offset. Furthermore, we release
+      <strong>MOSA-VPT</strong>, a novel, high-quality synthetic violin playing technique dataset to circumvent the need for
+      manually labeled annotations. Leveraging this dataset, our model demonstrated strong generalization to real-world
+      note-level violin technique recordings in addition to achieving state-of-the-art transcription performance.
+      To our knowledge, VioPTT is the first to jointly combine violin transcription and playing technique prediction
+      within a unified framework.
     </p>
     <div class="tags">
       <span class="tag">Violin Transcription</span>
-      <span class="tag">Technique Classification</span>
+      <span class="tag">Playing Technique Classification</span>
       <span class="tag">Synthetic Data Augmentation</span>
       <span class="tag">Music Information Retrieval</span>
     </div>
@@ -214,31 +251,33 @@
   <section id="method">
     <h2>System Overview</h2>
     <p>
-      The system operates in two stages that can be run end-to-end or independently:
+      VioPTT comprises two modules: a <strong>transcription module</strong> that predicts note onset, offset, velocity,
+      and frame activation at the frame level; and an <strong>articulation module</strong> that fuses per-note acoustic
+      embeddings with transcription features to classify playing technique.
     </p>
     <div class="method-steps">
       <div class="step">
         <div class="step-icon">🎻</div>
         <div class="step-title">Audio Input</div>
-        <div class="step-desc">Raw violin recording (.wav / .mp3 / .flac)</div>
+        <div class="step-desc">Raw violin recording (16 kHz, mono)</div>
       </div>
       <div class="step-arrow">→</div>
       <div class="step">
         <div class="step-icon">🎹</div>
-        <div class="step-title">Transcription</div>
-        <div class="step-desc">Note onset, offset &amp; velocity estimation via CRNN</div>
+        <div class="step-title">Transcription Module</div>
+        <div class="step-desc">CRNN predicts onset, offset, frame &amp; velocity at frame level</div>
       </div>
       <div class="step-arrow">→</div>
       <div class="step">
         <div class="step-icon">🏷️</div>
-        <div class="step-title">Technique Classification</div>
-        <div class="step-desc">Per-note technique labelling using transcription features</div>
+        <div class="step-title">Articulation Module</div>
+        <div class="step-desc">Fuses acoustic + transcription embeddings → technique label</div>
       </div>
       <div class="step-arrow">→</div>
       <div class="step">
         <div class="step-icon">📄</div>
         <div class="step-title">Output</div>
-        <div class="step-desc">MIDI file + CSV with per-note technique labels</div>
+        <div class="step-desc">MIDI + per-note technique CSV</div>
       </div>
     </div>
 
@@ -248,7 +287,7 @@
         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8b5cf6;margin-right:4px"></span>Flageolet
       </span>
       <span class="tag" style="background:#ecfdf5;color:#065f46;border-color:#a7f3d0">
-        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;margin-right:4px"></span>Normal
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;margin-right:4px"></span>Détaché
       </span>
       <span class="tag" style="background:#fffbeb;color:#92400e;border-color:#fde68a">
         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:4px"></span>Pizzicato
@@ -257,29 +296,37 @@
         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:4px"></span>Spiccato
       </span>
     </div>
+
+    <h3>MOSA-VPT Dataset</h3>
+    <p>
+      We introduce <strong>MOSA-VPT</strong>, a large-scale synthetic dataset of <strong>76 hours</strong> of audio–MIDI pairs
+      balanced across four techniques: détaché, flageolet, spiccato, and pizzicato.
+      Audio is rendered from MOSA MIDI scores using DAWDreamer with a professional virtual violin instrument
+      (Synchron Solo Violin I), with all room and spatial processing disabled. The dataset is fully annotation-free.
+    </p>
+    <p>
+      <a href="https://doi.org/10.5281/zenodo.18295471" target="_blank" style="color:var(--accent);font-weight:600">
+        → Download MOSA-VPT on Zenodo
+      </a>
+    </p>
   </section>
 
   <!-- Audio Examples -->
   <section id="audio-examples">
     <h2>Audio Examples</h2>
     <p>
-      Each row shows a violin audio excerpt and the per-note technique predicted by VioPTT.
-      Ground-truth technique labels are from the <strong>RWC Music Database</strong>.
+      Each row shows a single-note violin audio excerpt and the technique predicted by VioPTT.
+      Ground-truth technique labels are from the <strong>RWC Musical Instrument Sound Database</strong>.
     </p>
     <div class="note">
       🔊 Use headphones or quality speakers for the best listening experience.
+      Audio samples will be added here.
     </div>
 
     <h3>Flageolet</h3>
     <div class="audio-table-wrap">
       <table>
-        <thead>
-          <tr>
-            <th>Excerpt</th>
-            <th>Input Audio</th>
-            <th>Predicted Technique</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Sample</th><th>Input Audio</th><th>Predicted</th></tr></thead>
         <tbody>
           <tr>
             <td class="label-cell">Sample 1</td>
@@ -295,26 +342,20 @@
       </table>
     </div>
 
-    <h3>Normal Bowing</h3>
+    <h3>Détaché</h3>
     <div class="audio-table-wrap">
       <table>
-        <thead>
-          <tr>
-            <th>Excerpt</th>
-            <th>Input Audio</th>
-            <th>Predicted Technique</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Sample</th><th>Input Audio</th><th>Predicted</th></tr></thead>
         <tbody>
           <tr>
             <td class="label-cell">Sample 1</td>
-            <td><audio controls src="audio/normal_1.wav"></audio></td>
-            <td><span class="tech"><span class="dot dot-normal"></span>Normal</span></td>
+            <td><audio controls src="audio/detache_1.wav"></audio></td>
+            <td><span class="tech"><span class="dot dot-detache"></span>Détaché</span></td>
           </tr>
           <tr>
             <td class="label-cell">Sample 2</td>
-            <td><audio controls src="audio/normal_2.wav"></audio></td>
-            <td><span class="tech"><span class="dot dot-normal"></span>Normal</span></td>
+            <td><audio controls src="audio/detache_2.wav"></audio></td>
+            <td><span class="tech"><span class="dot dot-detache"></span>Détaché</span></td>
           </tr>
         </tbody>
       </table>
@@ -323,13 +364,7 @@
     <h3>Pizzicato</h3>
     <div class="audio-table-wrap">
       <table>
-        <thead>
-          <tr>
-            <th>Excerpt</th>
-            <th>Input Audio</th>
-            <th>Predicted Technique</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Sample</th><th>Input Audio</th><th>Predicted</th></tr></thead>
         <tbody>
           <tr>
             <td class="label-cell">Sample 1</td>
@@ -348,13 +383,7 @@
     <h3>Spiccato</h3>
     <div class="audio-table-wrap">
       <table>
-        <thead>
-          <tr>
-            <th>Excerpt</th>
-            <th>Input Audio</th>
-            <th>Predicted Technique</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Sample</th><th>Input Audio</th><th>Predicted</th></tr></thead>
         <tbody>
           <tr>
             <td class="label-cell">Sample 1</td>
@@ -373,60 +402,147 @@
 
   <!-- Results -->
   <section id="results">
-    <h2>Evaluation Results</h2>
-    <p>
-      Technique classification accuracy evaluated on the <strong>RWC Music Database</strong> (3-fold cross-validation).
-      Using all four transcription features (onset, offset, frame, velocity) as input to the classifier achieves the best balanced accuracy.
-    </p>
+    <h2>Results</h2>
 
+    <h3>Pitch &amp; Timing Transcription (Table 1)</h3>
+    <p>
+      Transcription performance on URMP and Bach10 violin tracks (Precision / Recall / F1 / onset-only F1).
+      Our model trained from scratch with augmentation matches state-of-the-art MUSC on URMP while
+      outperforming it on Bach10 despite using ~30% less training data.
+    </p>
     <div class="audio-table-wrap">
-      <table class="metrics-table">
+      <table class="results-table">
         <thead>
           <tr>
-            <th>Model / Features</th>
-            <th>Flageolet</th>
-            <th>Normal</th>
-            <th>Pizzicato</th>
-            <th>Spiccato</th>
-            <th>Balanced Acc.</th>
+            <th rowspan="2">Model</th>
+            <th colspan="4">URMP</th>
+            <th colspan="4">Bach10</th>
+          </tr>
+          <tr>
+            <th>P</th><th>R</th><th>F1</th><th>F1<sub>no</sub></th>
+            <th>P</th><th>R</th><th>F1</th><th>F1<sub>no</sub></th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>No transcription features (baseline)</td>
-            <td>—</td><td>—</td><td>—</td><td>—</td>
-            <td>—</td>
+            <td class="label-cell">Ours w/o aug</td>
+            <td>83.4</td><td>81.2</td><td>82.2</td><td>92.8</td>
+            <td>66.7</td><td>71.3</td><td>68.9</td><td>79.0</td>
           </tr>
           <tr>
-            <td>All features (onset + offset + frame + vel)</td>
-            <td>—</td><td>—</td><td>—</td><td>—</td>
-            <td class="best">—</td>
+            <td class="label-cell">Ours w/ aug</td>
+            <td class="second">86.1</td><td class="best">83.6</td><td class="second">84.5</td><td class="best">93.1</td>
+            <td>68.1</td><td>71.8</td><td>69.9</td><td>79.5</td>
           </tr>
           <tr>
-            <td>w/o onset</td>
-            <td>—</td><td>—</td><td>—</td><td>—</td>
-            <td>—</td>
+            <td class="label-cell">Ours + Piano FT w/o aug</td>
+            <td>84.4</td><td>79.0</td><td>81.3</td><td>91.3</td>
+            <td class="best">69.5</td><td class="best">73.7</td><td class="best">71.5</td><td class="best">80.2</td>
           </tr>
           <tr>
-            <td>w/o offset</td>
-            <td>—</td><td>—</td><td>—</td><td>—</td>
-            <td>—</td>
+            <td class="label-cell">Ours + Piano FT w/ aug</td>
+            <td>85.0</td><td>82.1</td><td>83.3</td><td>92.9</td>
+            <td>63.3</td><td>68.4</td><td>65.7</td><td>77.8</td>
+          </tr>
+          <tr class="separator"><td colspan="9">Baselines</td></tr>
+          <tr>
+            <td class="label-cell">MUSC [Tamer et al., ISMIR 2023]</td>
+            <td class="best">86.5</td><td class="second">83.1</td><td class="best">84.6</td><td class="second">93.0</td>
+            <td class="second">65.0</td><td>64.8</td><td class="second">64.8</td><td class="second">77.0</td>
           </tr>
           <tr>
-            <td>w/o frame</td>
-            <td>—</td><td>—</td><td>—</td><td>—</td>
-            <td>—</td>
-          </tr>
-          <tr>
-            <td>w/o velocity</td>
-            <td>—</td><td>—</td><td>—</td><td>—</td>
-            <td>—</td>
+            <td class="label-cell">MERTech [Li et al., ICASSP 2024]</td>
+            <td>26.6</td><td>33.7</td><td>29.8</td><td>30.3</td>
+            <td>27.6</td><td class="second">53.4</td><td>36.4</td><td>36.9</td>
           </tr>
         </tbody>
       </table>
     </div>
     <div class="note">
-      📋 Numerical results will be updated upon paper publication.
+      Bold = best; underlined = second-best per column. "FT" = fine-tuned from piano-pretrained checkpoint.
+    </div>
+
+    <h3 style="margin-top:2rem">Playing Technique Classification — Ablation Study (Table 2)</h3>
+    <p>
+      Macro accuracy and per-class accuracy on the RWC dataset (mean ± std over 3-fold cross-validation).
+      The <em>no ablation</em> condition (all four transcription features) achieves the best macro accuracy of
+      <strong>77.22%</strong>, outperforming MERTech (53.36%) by a large margin.
+    </p>
+    <div class="audio-table-wrap">
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Condition</th>
+            <th>Macro Acc (%)</th>
+            <th>Flageolet (%)</th>
+            <th>Détaché (%)</th>
+            <th>Pizzicato (%)</th>
+            <th>Spiccato (%)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="label-cell">Full ablation (audio only)</td>
+            <td>70.46 <small>±2.57</small></td>
+            <td class="second">86.44 <small>±4.19</small></td>
+            <td>51.75 <small>±9.97</small></td>
+            <td>57.06 <small>±15.33</small></td>
+            <td class="second">86.56 <small>±2.55</small></td>
+          </tr>
+          <tr>
+            <td class="label-cell">w/o frame</td>
+            <td>66.21 <small>±13.24</small></td>
+            <td>71.79 <small>±16.53</small></td>
+            <td class="best">70.16 <small>±32.58</small></td>
+            <td>63.80 <small>±38.66</small></td>
+            <td>59.10 <small>±19.71</small></td>
+          </tr>
+          <tr>
+            <td class="label-cell">w/o offset</td>
+            <td>59.71 <small>±10.19</small></td>
+            <td>72.80 <small>±27.65</small></td>
+            <td>55.41 <small>±24.71</small></td>
+            <td>52.75 <small>±45.82</small></td>
+            <td>57.85 <small>±24.79</small></td>
+          </tr>
+          <tr>
+            <td class="label-cell">w/o onset</td>
+            <td>65.82 <small>±8.63</small></td>
+            <td class="best">91.55 <small>±1.96</small></td>
+            <td>51.94 <small>±19.77</small></td>
+            <td class="second">65.47 <small>±20.35</small></td>
+            <td>54.34 <small>±11.90</small></td>
+          </tr>
+          <tr>
+            <td class="label-cell">w/o velocity</td>
+            <td>55.59 <small>±3.55</small></td>
+            <td>77.07 <small>±22.73</small></td>
+            <td class="second">65.67 <small>±26.70</small></td>
+            <td>0.16 <small>±0.28</small></td>
+            <td class="best">79.45 <small>±2.81</small></td>
+          </tr>
+          <tr>
+            <td class="label-cell"><strong>No ablation (all features)</strong></td>
+            <td class="best">77.22 <small>±6.35</small></td>
+            <td>71.89 <small>±14.12</small></td>
+            <td>63.12 <small>±12.59</small></td>
+            <td class="best">88.80 <small>±3.11</small></td>
+            <td>85.08 <small>±4.87</small></td>
+          </tr>
+          <tr class="separator"><td colspan="6">Baseline</td></tr>
+          <tr>
+            <td class="label-cell">MERTech [Li et al., ICASSP 2024]</td>
+            <td>53.36 <small>±1.02</small></td>
+            <td>95.77 <small>±2.23</small></td>
+            <td>58.80 <small>±1.63</small></td>
+            <td>43.27 <small>±1.19</small></td>
+            <td>15.61 <small>±2.06</small></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">
+      Bold = best; underlined = second-best per column. Results reported as mean ± std over three data splits.
     </div>
   </section>
 
@@ -434,11 +550,11 @@
   <section id="citation">
     <h2>Citation</h2>
     <p>If you find this work useful, please cite:</p>
-    <pre style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:1rem;font-size:0.82rem;overflow-x:auto;line-height:1.6">@misc{peng2025vioptt,
-  title     = {VioPTT: Violin Technique-Aware Transcription from Synthetic Data Augmentation},
-  author    = {Yueh-Po Peng},
-  year      = {2025},
-  url       = {https://github.com/y10ab1/VioPTT}
+    <pre style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:1rem;font-size:0.82rem;overflow-x:auto;line-height:1.6">@article{wang2025vioptt,
+  title   = {VioPTT: Violin Playing Technique-Aware Transcription from Synthetic Data Augmentation},
+  author  = {Wang, Ting-Kang and Peng, Yueh-Po and Su, Li and Cheung, Vincent K.M.},
+  journal = {arXiv preprint arXiv:2509.23759},
+  year    = {2025}
 }</pre>
   </section>
 
