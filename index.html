@@ -102,10 +102,15 @@
 
     /* ── Method steps ── */
     .method-steps {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 1rem;
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 0.5rem;
       margin-top: 1.2rem;
+      overflow-x: auto;
+    }
+    .method-steps .step {
+      flex: 1 0 130px;
     }
     .step {
       background: var(--card-bg);
