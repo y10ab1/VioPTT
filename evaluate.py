@@ -20,7 +20,7 @@ from inference import PianoTranscription
 import pandas as pd
 from pathlib import Path
 
-from data_utils import get_song_folders_bach10, get_song_folders_bvd, get_song_folders_urmp, get_ref_note_events, get_ref_note_events_bach10, get_ref_note_events_bvd, get_ref_note_events_urmp
+from data_utils import get_song_folders_bach10, get_song_folders_bvd, get_song_folders_urmp, get_song_folders_mosapt, get_ref_note_events, get_ref_note_events_bach10, get_ref_note_events_bvd, get_ref_note_events_urmp, get_ref_note_events_mosapt
 
 class Evaluator(object):
     def __init__(self, dataset, output_dir, checkpoint_path, model_type='Note_pedal', 
@@ -73,6 +73,9 @@ class Evaluator(object):
             print(f"Found {len(self.song_folders)} songs in URMP dataset")
         elif self.dataset == "bvd":
             self.song_folders = get_song_folders_bvd()
+        elif self.dataset == "mosapt":
+            self.song_folders = get_song_folders_mosapt(prefix='ba3')
+            print(f"Found {len(self.song_folders)} songs in MOSAPT dataset (prefix=ba3)")
         else:
             raise ValueError(f"Invalid dataset: {self.dataset}")
         
@@ -106,7 +109,17 @@ class Evaluator(object):
         
         # try:
             # Load audio
-        audio, _ = load_audio(audio_path, sr=self.sample_rate, mono=True)
+        if self.dataset == "mosapt":
+            import h5py
+            from utilities import int16_to_float32
+            with h5py.File(audio_path, 'r') as hf:
+                audio = int16_to_float32(hf['waveform'][:])
+        else:
+            audio, _ = load_audio(audio_path, sr=self.sample_rate, mono=True)
+
+        # Normalize audio before transcription
+        if audio.size > 0:
+            audio = audio / (np.max(np.abs(audio)) + 1e-8)
 
         # save audio to wav for checking, using librosa
         # import soundfile as sf
@@ -145,6 +158,8 @@ class Evaluator(object):
             ref_on_off_pairs, ref_midi_notes, _ = get_ref_note_events_bvd(midi_path, align_path)
         elif self.dataset == "urmp":
             ref_on_off_pairs, ref_midi_notes, _ = get_ref_note_events_urmp(midi_path)
+        elif self.dataset == "mosapt":
+            ref_on_off_pairs, ref_midi_notes, _ = get_ref_note_events_mosapt(midi_path)
         else:
             raise ValueError(f"Invalid dataset: {self.dataset}")
 
@@ -170,6 +185,7 @@ class Evaluator(object):
                 'precision': 0.0,
                 'recall': 0.0,
                 'f1': 0.0,
+                'f1_wo_offset': 0.0,
                 'num_ref_notes': len(ref_on_off_pairs),
                 'num_est_notes': 0
             }
@@ -242,7 +258,7 @@ class Evaluator(object):
             )
         else:
             print(f"Warning: No notes detected for {song_name}")
-            precision, recall, f1 = 0.0, 0.0, 0.0
+            precision, recall, f1, f1_wo_offset = 0.0, 0.0, 0.0, 0.0
         
         result = {
             'song_name': song_name,
@@ -355,7 +371,7 @@ class Evaluator(object):
 def main():
     parser = argparse.ArgumentParser(description='Evaluate piano transcription on BVD dataset')
     parser.add_argument('--dataset', type=str, required=True,
-                       help='dataset to evaluate', choices=['bach10', 'urmp'])
+                       help='dataset to evaluate', choices=['bach10', 'urmp', 'mosapt'])
     parser.add_argument('--checkpoint_path', type=str, required=True,
                        help='Path to model checkpoint')
     parser.add_argument('--model_type', type=str, default='Note_pedal',
