@@ -15,7 +15,7 @@ OUTPUT_DIR="${WORKSPACE}/output/rwc_full_tracks_technique_classification"
 
 # Model checkpoints
 # NOTE_MODEL_CHECKPOINT="${WORKSPACE}/checkpoints/note_tech_model.pth"
-NOTE_MODEL_CHECKPOINT="${WORKSPACE}/checkpoints/note_tech_cv_no_ablation/note_tech_model_fold_2.pth"
+NOTE_MODEL_CHECKPOINT="${WORKSPACE}/checkpoints/note_tech_cv/note_tech_model_fold_2.pth"
 TRANSCRIPTOR_CHECKPOINT="${WORKSPACE}/checkpoints/transcriptor_model.pth"
 
 # Transcription features to use

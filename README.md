@@ -9,16 +9,7 @@ pip install -r requirements.txt
 
 **Note**: Before running the scripts, you need to modify the paths in the scripts according to your setup.
 
-#### Option A: End-to-end (recommended)
-Transcription and technique classification in a single step — no pre-existing MIDI required.
-
-```bash
-# Audio → MIDI + per-note technique labels (CSV) in one pass
-# Edit AUDIO_DIR, OUTPUT_DIR, and checkpoint paths in the script before running
-bash scripts/run_infer_technique.sh
-```
-
-#### Option B: Two-step pipeline
+#### Option A: Two-step pipeline
 Run transcription and technique classification separately.
 
 ```bash
@@ -32,17 +23,16 @@ bash scripts/run_HRPT_inference.sh
 bash scripts/run_HRPT_inference_note_tech.sh
 ```
 
-### Description
-- **scripts/run_infer_technique.sh**: End-to-end transcription + technique classification
-  - Takes raw audio as input; no pre-existing MIDI needed
-  - Outputs per-note technique labels to CSV and a technique-annotated MIDI file
-  - Uses the full model (all transcription features, no ablation)
-  - **Configuration required**: Edit the following variables at the top of the script:
-    - `AUDIO_DIR`: Directory containing audio files (.wav, .mp3, .flac)
-    - `OUTPUT_DIR`: Output directory for CSV and MIDI files
-    - `NOTE_MODEL_CHECKPOINT`: Path to note technique model (`checkpoints/note_tech_cv_no_ablation/note_tech_model_fold_2.pth`)
-    - `TRANSCRIPTOR_CHECKPOINT`: Path to transcription model checkpoint
+#### Option B: End-to-end
+Transcription and technique classification in a single step — no pre-existing MIDI required.
 
+```bash
+# Audio → MIDI + per-note technique labels (CSV) in one pass
+# Edit AUDIO_DIR, OUTPUT_DIR, and checkpoint paths in the script before running
+bash scripts/run_infer_technique.sh
+```
+
+### Description
 - **scripts/run_HRPT_inference.sh**: Convert audio files to MIDI format
   - Supports .wav, .mp3, .flac formats
   - Can process single file or entire directory
@@ -60,3 +50,13 @@ bash scripts/run_HRPT_inference_note_tech.sh
     - `OUTPUT_DIR`: Output directory for technique CSV files
     - `NOTE_MODEL_CHECKPOINT`: Path to note technique model
     - `TRANSCRIPTOR_CHECKPOINT`: Path to transcriptor model
+
+- **scripts/run_infer_technique.sh**: End-to-end transcription + technique classification
+  - Takes raw audio as input; no pre-existing MIDI needed
+  - Outputs per-note technique labels to CSV and a technique-annotated MIDI file
+  - Uses the full model (all transcription features, no ablation)
+  - **Configuration required**: Edit the following variables at the top of the script:
+    - `AUDIO_DIR`: Directory containing audio files (.wav, .mp3, .flac)
+    - `OUTPUT_DIR`: Output directory for CSV and MIDI files
+    - `NOTE_MODEL_CHECKPOINT`: Path to note technique model (`checkpoints/note_tech_cv/note_tech_model_fold_2.pth`)
+    - `TRANSCRIPTOR_CHECKPOINT`: Path to transcription model checkpoint
