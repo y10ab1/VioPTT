@@ -58,5 +58,5 @@ bash scripts/run_infer_technique.sh
   - **Configuration required**: Edit the following variables at the top of the script:
     - `AUDIO_DIR`: Directory containing audio files (.wav, .mp3, .flac)
     - `OUTPUT_DIR`: Output directory for CSV and MIDI files
-    - `NOTE_MODEL_CHECKPOINT`: Path to note technique model (`checkpoints/note_tech_cv/note_tech_model_fold_2.pth`)
+    - `NOTE_MODEL_CHECKPOINT`: Path to note technique model (`checkpoints/note_tech_model.pth`)
     - `TRANSCRIPTOR_CHECKPOINT`: Path to transcription model checkpoint
