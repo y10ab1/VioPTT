@@ -29,6 +29,7 @@ from losses import (
     offset_binary_supcon_loss,
     per_pitch_onoff_ctc_loss,
     technique_frame_ce_loss,
+    viotech_technique_losses,
 )
 from evaluate import SegmentEvaluator
 import config
@@ -447,20 +448,21 @@ def train(args):
                 evaluate_test_sampler = None
             elif dataset == 'viotech':
                 # Similar to mosa/mosapt but for viotech
+                print(f'Creating train and evaluate datasets for viotech...')
                 train_dataset = CustomDataset(
                     hdf5s_dir=hdf5s_dir,
                     segment_seconds=segment_seconds,
                     frames_per_second=frames_per_second,
                     max_note_shift=max_note_shift,
                     augmentor=augmentor,
-                    include_technique_label=False, # Use False for now as per "mimic mosa"
+                    include_technique_label=True, # Use False for now as per "mimic mosa"
                 )
                 evaluate_dataset = CustomDataset(
                     hdf5s_dir=hdf5s_dir,
                     segment_seconds=segment_seconds,
                     frames_per_second=frames_per_second,
                     max_note_shift=0,
-                    include_technique_label=False,
+                    include_technique_label=True,
                 )
 
                 # Sampler for training
@@ -586,6 +588,7 @@ def train(args):
             batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True)
         test_loader = evaluate_train_loader
     else:
+        print(f'Creating train and evaluate loaders for {dataset}...')
         train_loader = torch.utils.data.DataLoader(dataset=train_dataset, 
             batch_sampler=train_sampler, collate_fn=collate_fn, 
             num_workers=num_workers, pin_memory=True)
@@ -668,7 +671,7 @@ def train(args):
     # print('GPU number: {}'.format(torch.cuda.device_count()))
     # model = torch.nn.DataParallel(model)
     
-
+    print(f'Training model...')
     train_bgn_time = time.time()
 
     for batch_data_dict in train_loader:
@@ -770,16 +773,20 @@ def train(args):
             batch_data_dict['reg_onset_features'] = aux_contrast_onset_model(batch_output_dict['reg_onset_features'])
             batch_data_dict['reg_offset_features'] = aux_contrast_offset_model(batch_output_dict['reg_offset_features'])
 
+        print('batch_data_dict keys: ', batch_data_dict.keys())
 
-        # Technique classification loss only when batch has technique labels
-        if technique_weight > 0 and ('technique' in batch_data_dict):
+        # Technique classification losses (3-head for viotech, legacy single-head otherwise)
+        if technique_weight > 0 and ('tonal_technique' in batch_data_dict):
+            loss_tonal, loss_artic, loss_legato = viotech_technique_losses(
+                batch_output_dict, batch_data_dict, device=device)
+            loss_technique = loss_tonal + loss_artic + loss_legato
+        elif technique_weight > 0 and ('technique' in batch_data_dict):
             loss_technique = technique_frame_ce_loss(
-                batch_output_dict,
-                batch_data_dict,
-                device=device,
-            )
+                batch_output_dict, batch_data_dict, device=device)
+            loss_tonal = loss_artic = loss_legato = None
         else:
             loss_technique = torch.tensor(0.0, device=device)
+            loss_tonal = loss_artic = loss_legato = None
 
         if contrast_weight > 0:
             loss_contrast = onset_binary_supcon_loss(batch_output_dict, batch_data_dict) + offset_binary_supcon_loss(batch_output_dict, batch_data_dict)
@@ -809,6 +816,12 @@ def train(args):
             writer.add_scalar('train/loss_ctc', loss_ctc.item(), iteration)
         if technique_weight > 0:
             writer.add_scalar('train/loss_technique', loss_technique.item(), iteration)
+            if loss_tonal is not None:
+                writer.add_scalar('train/loss_tonal_technique', loss_tonal.item(), iteration)
+            if loss_artic is not None:
+                writer.add_scalar('train/loss_articulation', loss_artic.item(), iteration)
+            if loss_legato is not None:
+                writer.add_scalar('train/loss_legato', loss_legato.item(), iteration)
 
         preview_loss = {
             'loss': loss.item(),
@@ -816,13 +829,16 @@ def train(args):
         }
 
         if ctc_weight > 0:
-            # print('iteration:', iteration, 'loss:', loss.item(), 'base_loss:', base_loss.item(), 'loss_contrast:', loss_contrast.item(), 'loss_ctc:', loss_ctc.item())
             preview_loss['loss_ctc'] = loss_ctc.item()
         if technique_weight > 0:
-            # print('iteration:', iteration, 'loss:', loss.item(), 'base_loss:', base_loss.item(), 'loss_contrast:', loss_contrast.item(), 'loss_technique:', loss_technique.item())
             preview_loss['loss_technique'] = loss_technique.item()
+            if loss_tonal is not None:
+                preview_loss['loss_tonal'] = loss_tonal.item()
+            if loss_artic is not None:
+                preview_loss['loss_artic'] = loss_artic.item()
+            if loss_legato is not None:
+                preview_loss['loss_legato'] = loss_legato.item()
         if contrast_weight > 0:
-            # print('iteration:', iteration, 'loss:', loss.item(), 'base_loss:', base_loss.item(), 'loss_contrast:', loss_contrast.item())
             preview_loss['loss_contrast'] = loss_contrast.item()
         
         # flatten the string of preview_loss

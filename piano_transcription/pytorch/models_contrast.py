@@ -13,6 +13,11 @@ import torch.nn.functional as F
 from torchlibrosa.stft import Spectrogram, LogmelFilterBank
 from pytorch_utils import move_data_to_device
 
+try:
+    from multilabel_technique_model import NoteWiseTechniqueHead
+except ImportError:
+    NoteWiseTechniqueHead = None
+
 
 def init_layer(layer):
     """Initialize a Linear or Convolutional layer. """
@@ -163,6 +168,43 @@ class AcousticModelCRnn8Dropout(nn.Module):
             return output
 
 
+class FrameLevelTechniqueHead(nn.Module):
+    """Three parallel FC heads for frame-level technique classification.
+
+    Expects pre-extracted acoustic features (e.g. 512-dim GRU output from
+    AcousticModelCRnn8Dropout) and produces:
+      - tonal_technique: (B, T, num_tonal) logits
+      - articulation:    (B, T, num_artic) logits
+      - legato:          (B, T, 1)         sigmoid probability
+    """
+    def __init__(self, in_features=512, num_tonal_classes=4, num_artic_classes=4):
+        super(FrameLevelTechniqueHead, self).__init__()
+
+        self.tonal_fc = nn.Linear(in_features, num_tonal_classes, bias=True)
+        self.artic_fc = nn.Linear(in_features, num_artic_classes, bias=True)
+        self.legato_fc = nn.Linear(in_features, 1, bias=True)
+
+        init_layer(self.tonal_fc)
+        init_layer(self.artic_fc)
+        init_layer(self.legato_fc)
+
+    def forward(self, x):
+        """
+        Args:
+          x: (B, T, in_features) — acoustic features from dedicated CRNN branch
+
+        Returns:
+          tonal_output:  (B, T, num_tonal_classes) raw logits
+          artic_output:  (B, T, num_artic_classes) raw logits
+          legato_output: (B, T, 1)                 sigmoid probability
+        """
+        tonal_output = self.tonal_fc(x)
+        artic_output = self.artic_fc(x)
+        legato_output = torch.sigmoid(self.legato_fc(x))
+
+        return tonal_output, artic_output, legato_output
+
+
 class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
     def __init__(self, frames_per_second, classes_num, output_features=False, predict_technique=False):
         super(Regress_onset_offset_frame_velocity_CRNN, self).__init__()
@@ -203,25 +245,17 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
         self.reg_offset_model = AcousticModelCRnn8Dropout(classes_num, midfeat, momentum, output_features)
         self.velocity_model = AcousticModelCRnn8Dropout(classes_num, midfeat, momentum, output_features)
         if self.predict_technique:
-            # Use local-context technique model that consumes precomputed logmel features (no global sequence context)
-            self.technique_model = LocalTechniqueFeatureConvModel(
-                classes_num=technique_classes_num,
-                window_size=10,
-                proj_size=256,
-                hidden_size=128,
-                momentum=momentum,
-                output_features=output_features,
+            self.technique_acoustic = AcousticModelCRnn8Dropout(
+                classes_num, midfeat, momentum, output_features=True)
+            self.technique_head = FrameLevelTechniqueHead(
+                in_features=512,       # bidirectional GRU hidden dim from technique_acoustic
+                num_tonal_classes=4,
+                num_artic_classes=4,
             )
-            self.use_local_technique = True
 
-        self.technique_gru = nn.GRU(input_size=88 * 3 + 5, hidden_size=256, num_layers=1, 
-            bias=True, batch_first=True, dropout=0., bidirectional=True)
         self.reg_onset_gru = nn.GRU(input_size=88 * 2, hidden_size=256, num_layers=1, 
             bias=True, batch_first=True, dropout=0., bidirectional=True)
         self.reg_onset_fc = nn.Linear(512, classes_num, bias=True)
-        if self.predict_technique:
-            # self.technique_fc = nn.Linear(512, technique_classes_num, bias=True)
-            self.technique_fc = nn.Linear(269, technique_classes_num, bias=True)
 
         self.frame_gru = nn.GRU(input_size=88 * 3, hidden_size=256, num_layers=1, 
             bias=True, batch_first=True, dropout=0., bidirectional=True)
@@ -241,9 +275,6 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
         init_gru(self.frame_gru)
         init_layer(self.reg_onset_fc)
         init_layer(self.frame_fc)
-        if self.predict_technique:
-            init_gru(self.technique_gru)
-            init_layer(self.technique_fc)
 
     def forward(self, input):
         """
@@ -266,20 +297,19 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
         x = self.bn0(x)
         x = x.transpose(1, 3)
 
+        if self.predict_technique:
+            logmel = x  # save (B, 1, T, mel_bins) before x gets overwritten
+
         if self.output_features:
             frame_output, frame_features = self.frame_model(x)
             reg_onset_output, reg_onset_features = self.reg_onset_model(x)
             reg_offset_output, reg_offset_features = self.reg_offset_model(x)
             velocity_output, velocity_features = self.velocity_model(x)
-            if self.predict_technique:
-                technique_output, technique_features = self.technique_model(x)
         else:
             frame_output = self.frame_model(x)  # (batch_size, time_steps, classes_num)
             reg_onset_output = self.reg_onset_model(x)  # (batch_size, time_steps, classes_num)
             reg_offset_output = self.reg_offset_model(x)    # (batch_size, time_steps, classes_num)
             velocity_output = self.velocity_model(x)    # (batch_size, time_steps, classes_num)
-            if self.predict_technique:
-                technique_output = self.technique_model(x)    # (batch_size, time_steps, classes_num)
 
         # Use velocities to condition onset regression
         x = torch.cat((reg_onset_output, (reg_onset_output ** 0.5) * velocity_output.detach()), dim=2)
@@ -295,24 +325,16 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
         frame_output = torch.sigmoid(self.frame_fc(x))  # (batch_size, time_steps, classes_num)
         """(batch_size, time_steps, classes_num)"""
 
-        # Use onset, offset, frame, technique features to condition technique classification
+        # Technique branch: dedicated acoustic encoder on the same log-mel
         if self.predict_technique:
-            x = torch.cat((reg_onset_output.detach(), reg_offset_output.detach(), frame_output.detach(), technique_output), dim=2)
-            # (x, _) = self.technique_gru(x)
-            x = F.dropout(x, p=0.5, training=self.training, inplace=False)
-            technique_output = torch.sigmoid(self.technique_fc(x))  # (batch_size, time_steps, classes_num)
-        """(batch_size, time_steps, classes_num)"""
-
+            _, tech_features = self.technique_acoustic(logmel)  # (B, T, 512)
+            tonal_output, artic_output, legato_output = self.technique_head(tech_features)
 
         output_dict = {
             'reg_onset_output': reg_onset_output, 
             'reg_offset_output': reg_offset_output, 
             'frame_output': frame_output, 
             'velocity_output': velocity_output,
-            # 'frame_features': frame_features,
-            # 'reg_onset_features': reg_onset_features,
-            # 'reg_offset_features': reg_offset_features,
-            # 'velocity_features': velocity_features,
         }
         if self.output_features:
             output_dict['frame_features'] = frame_features
@@ -321,18 +343,9 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
             output_dict['velocity_features'] = velocity_features
         
         if self.predict_technique:
-            output_dict['technique_output'] = technique_output
-        
-        if self.predict_technique and self.output_features:
-            output_dict['technique_features'] = technique_features
-
-        # if self.output_features:
-        #     self.output_features_dict['frame_features'] = frame_features
-        #     self.output_features_dict['reg_onset_features'] = reg_onset_features
-        #     self.output_features_dict['reg_offset_features'] = reg_offset_features
-        #     self.output_features_dict['velocity_features'] = velocity_features
-
-        #     return output_dict, self.output_features_dict
+            output_dict['tonal_technique_output'] = tonal_output    # (B, T, 4) logits
+            output_dict['articulation_output'] = artic_output       # (B, T, 4) logits
+            output_dict['legato_output'] = legato_output            # (B, T, 1) sigmoid
 
         return output_dict
 

@@ -5,42 +5,28 @@ from pytorch_metric_learning import losses, reducers, miners
 from einops import rearrange
 
 def technique_frame_ce_loss(output_dict, target_dict, device=None, use_active_mask=True):
-    """Frame-level technique classification loss using model technique head.
-
-    Args:
-      output_dict: must contain 'technique_output' of shape (B, T, C), C=5.
-      target_dict: must contain 'technique' one-hot tensor (B, T, C), C=5.
-      device: optional torch.device for creating zero tensors.
-
-    Returns:
-      CrossEntropy loss over frames.
-    """
+    """Legacy single-head technique loss (kept for backward compatibility)."""
     if ('technique_output' not in output_dict) or ('technique' not in target_dict):
         return torch.tensor(0.0, device=device if device is not None else None)
 
-    probs = output_dict['technique_output']  # (B, T_pred, C)
+    probs = output_dict['technique_output']
     eps = 1e-6
     probs = probs.clamp(min=eps, max=1.0 - eps)
-    logits = torch.log(probs) - torch.log(1.0 - probs)  # (B, T_pred, C)
+    logits = torch.log(probs) - torch.log(1.0 - probs)
 
-    technique_labels = target_dict['technique']  # (B, T_tgt, C) one-hot
+    technique_labels = target_dict['technique']
 
-    # Align time dimensions if they differ
     if logits.shape[1] != technique_labels.shape[1]:
         min_T = min(logits.shape[1], technique_labels.shape[1])
         logits = logits[:, :min_T, :]
         technique_labels = technique_labels[:, :min_T, :]
 
-    target_indices = torch.argmax(technique_labels, dim=-1)  # (B, T)
+    target_indices = torch.argmax(technique_labels, dim=-1)
+    logits_2d = logits.reshape(-1, logits.shape[-1])
+    targets_1d = target_indices.reshape(-1)
 
-    logits_2d = logits.reshape(-1, logits.shape[-1])  # (B*T, C)
-    targets_1d = target_indices.reshape(-1)  # (B*T,)
-
-    # Optionally ignore silent frames using frame-wise activity mask
     if use_active_mask and ('frame_roll' in target_dict):
-        # Active if any pitch is on
-        frame_activity = (target_dict['frame_roll'].sum(dim=-1) > 0)  # (B, T_fr) bool
-        # Align mask time dimension as well
+        frame_activity = (target_dict['frame_roll'].sum(dim=-1) > 0)
         if frame_activity.shape[1] != logits.shape[1]:
             min_Tm = min(frame_activity.shape[1], logits.shape[1])
             frame_activity = frame_activity[:, :min_Tm]
@@ -54,8 +40,138 @@ def technique_frame_ce_loss(output_dict, target_dict, device=None, use_active_ma
             return torch.tensor(0.0, device=logits.device if hasattr(logits, 'device') else device)
     ce = nn.CrossEntropyLoss(reduction='mean')
     loss = ce(logits_2d, targets_1d)
-
     return loss
+
+
+def _get_active_mask(target_dict, T_pred):
+    """Build a boolean active-frame mask from frame_roll, aligned to T_pred."""
+    if 'frame_roll' not in target_dict:
+        return None
+    frame_activity = (target_dict['frame_roll'].sum(dim=-1) > 0)  # (B, T_fr)
+    if frame_activity.shape[1] != T_pred:
+        min_T = min(frame_activity.shape[1], T_pred)
+        frame_activity = frame_activity[:, :min_T]
+    return frame_activity
+
+
+def tonal_technique_loss(output_dict, target_dict, device=None, use_active_mask=True):
+    """Frame-level CE loss for tonal technique (4-class).
+
+    output_dict['tonal_technique_output']: (B, T, 4) raw logits
+    target_dict['tonal_technique']:        (B, T)    int labels in {0,1,2,3}
+    """
+    key_out, key_tgt = 'tonal_technique_output', 'tonal_technique'
+    if (key_out not in output_dict) or (key_tgt not in target_dict):
+        return torch.tensor(0.0, device=device)
+
+    logits = output_dict[key_out]        # (B, T_pred, 4)
+    targets = target_dict[key_tgt].long()  # (B, T_tgt)
+
+    T_pred = logits.shape[1]
+    T_tgt = targets.shape[1]
+    if T_pred != T_tgt:
+        min_T = min(T_pred, T_tgt)
+        logits = logits[:, :min_T, :]
+        targets = targets[:, :min_T]
+
+    logits_2d = logits.reshape(-1, logits.shape[-1])
+    targets_1d = targets.reshape(-1)
+
+    if use_active_mask:
+        mask = _get_active_mask(target_dict, logits.shape[1])
+        if mask is not None:
+            mask_1d = mask.reshape(-1)
+            if mask_1d.any():
+                logits_2d = logits_2d[mask_1d]
+                targets_1d = targets_1d[mask_1d]
+            else:
+                return torch.tensor(0.0, device=logits.device)
+
+    return nn.CrossEntropyLoss()(logits_2d, targets_1d)
+
+
+def articulation_loss(output_dict, target_dict, device=None, use_active_mask=True):
+    """Frame-level CE loss for articulation (4-class).
+
+    output_dict['articulation_output']: (B, T, 4) raw logits
+    target_dict['articulation']:        (B, T)    int labels in {0,1,2,3}
+    """
+    key_out, key_tgt = 'articulation_output', 'articulation'
+    if (key_out not in output_dict) or (key_tgt not in target_dict):
+        return torch.tensor(0.0, device=device)
+
+    logits = output_dict[key_out]
+    targets = target_dict[key_tgt].long()
+
+    T_pred = logits.shape[1]
+    T_tgt = targets.shape[1]
+    if T_pred != T_tgt:
+        min_T = min(T_pred, T_tgt)
+        logits = logits[:, :min_T, :]
+        targets = targets[:, :min_T]
+
+    logits_2d = logits.reshape(-1, logits.shape[-1])
+    targets_1d = targets.reshape(-1)
+
+    if use_active_mask:
+        mask = _get_active_mask(target_dict, logits.shape[1])
+        if mask is not None:
+            mask_1d = mask.reshape(-1)
+            if mask_1d.any():
+                logits_2d = logits_2d[mask_1d]
+                targets_1d = targets_1d[mask_1d]
+            else:
+                return torch.tensor(0.0, device=logits.device)
+
+    return nn.CrossEntropyLoss()(logits_2d, targets_1d)
+
+
+def legato_loss(output_dict, target_dict, device=None, use_active_mask=True):
+    """Frame-level BCE loss for legato (binary).
+
+    output_dict['legato_output']: (B, T, 1) sigmoid probabilities
+    target_dict['legato']:        (B, T)    int labels in {0, 1}
+    """
+    key_out, key_tgt = 'legato_output', 'legato'
+    if (key_out not in output_dict) or (key_tgt not in target_dict):
+        return torch.tensor(0.0, device=device)
+
+    pred = output_dict[key_out].squeeze(-1)  # (B, T_pred)
+    targets = target_dict[key_tgt].float()   # (B, T_tgt)
+
+    T_pred = pred.shape[1]
+    T_tgt = targets.shape[1]
+    if T_pred != T_tgt:
+        min_T = min(T_pred, T_tgt)
+        pred = pred[:, :min_T]
+        targets = targets[:, :min_T]
+
+    pred_1d = pred.reshape(-1)
+    targets_1d = targets.reshape(-1)
+
+    if use_active_mask:
+        mask = _get_active_mask(target_dict, pred.shape[1])
+        if mask is not None:
+            mask_1d = mask.reshape(-1)
+            if mask_1d.any():
+                pred_1d = pred_1d[mask_1d]
+                targets_1d = targets_1d[mask_1d]
+            else:
+                return torch.tensor(0.0, device=pred.device)
+
+    return F.binary_cross_entropy(pred_1d, targets_1d)
+
+
+def viotech_technique_losses(output_dict, target_dict, device=None, use_active_mask=True):
+    """Compute all three technique losses and return them separately.
+
+    Returns:
+      (loss_tonal, loss_artic, loss_legato) — each a scalar tensor.
+    """
+    loss_tonal = tonal_technique_loss(output_dict, target_dict, device, use_active_mask)
+    loss_artic = articulation_loss(output_dict, target_dict, device, use_active_mask)
+    loss_leg = legato_loss(output_dict, target_dict, device, use_active_mask)
+    return loss_tonal, loss_artic, loss_leg
 
 def technique_aux_frame_ce_loss(aux_technique_model, output_dict, target_dict, device=None):
     """Auxiliary frame-level technique classification loss.

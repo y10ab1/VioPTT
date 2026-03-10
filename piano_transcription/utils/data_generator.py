@@ -699,27 +699,73 @@ class CustomDataset(object):
         for key in target_dict.keys():
             data_dict[key] = target_dict[key]
 
-        # Optionally include technique label parsed from filename for mosapt
         if self.include_technique_label:
-            technique_name = self._extract_technique_name(hdf5_name)
-            technique_one_hot = self._technique_one_hot(technique_name)
-            # Create frame-level technique labels; silent frames -> 'no_technique'
-            if 'frame_roll' in data_dict:
-                frames_num = data_dict['frame_roll'].shape[0]
-            else:
-                frames_num = target_dict['frame_roll'].shape[0]
-            technique_roll = np.tile(technique_one_hot, (frames_num, 1))
-            # For silent frames, set the one-hot to no_technique
-            frame_activity = np.any(target_dict['frame_roll'] > 0, axis=1)
-            no_idx = self.technique_classes.index('no_technique')
-            technique_roll[~frame_activity, :] = 0.0
-            technique_roll[~frame_activity, no_idx] = 1.0
-            data_dict['technique'] = technique_roll.astype(np.float32)
+            frames_num = int(round(self.segment_seconds * self.frames_per_second)) + 1
+            end_time = start_time + self.segment_seconds
 
-        debugging = False
-        if debugging:
-            plot_waveform_midi_targets(data_dict, start_time, note_events)
-            exit()
+            with h5py.File(hdf5_path, 'r') as hf:
+                has_viotech = all(k in hf for k in ('tonalTechnique', 'articulation', 'legato'))
+                if has_viotech:
+                    evt_times = hf['midi_event_time'][:]
+                    evt_strings = [e.decode() for e in hf['midi_event'][:]]
+                    evt_tonal = hf['tonalTechnique'][:]
+                    evt_artic = hf['articulation'][:]
+                    evt_legato = hf['legato'][:]
+
+            if has_viotech:
+                tonal_roll = np.zeros(frames_num, dtype=np.int32)
+                artic_roll = np.zeros(frames_num, dtype=np.int32)
+                # legato_roll: 1 = sustained (no bow change), 0 = bow change at onset
+                legato_roll = np.ones(frames_num, dtype=np.int32)
+                bow_change_half_width = 2  # ±2 frames (~±20ms at 100fps)
+
+                pending = {}  # pitch -> (onset_time, tonal, artic, legato)
+                for i, evt_str in enumerate(evt_strings):
+                    if 'note_on' in evt_str:
+                        for tok in evt_str.split():
+                            if tok.startswith('note='):
+                                pitch = int(tok.split('=')[1])
+                                pending[pitch] = (evt_times[i], evt_tonal[i], evt_artic[i], evt_legato[i])
+                                break
+                    elif 'note_off' in evt_str:
+                        for tok in evt_str.split():
+                            if tok.startswith('note='):
+                                pitch = int(tok.split('=')[1])
+                                break
+                        else:
+                            continue
+                        if pitch in pending:
+                            onset_t, tv, av, lv = pending.pop(pitch)
+                            offset_t = evt_times[i]
+                            if offset_t > start_time and onset_t < end_time:
+                                local_on = max(0.0, onset_t - start_time)
+                                local_off = min(self.segment_seconds, offset_t - start_time)
+                                f0 = max(0, min(frames_num, int(round(local_on * self.frames_per_second))))
+                                f1 = max(0, min(frames_num, int(round(local_off * self.frames_per_second))))
+                                if f1 > f0:
+                                    tonal_roll[f0:f1] = tv
+                                    artic_roll[f0:f1] = av
+                                    # Bow change: stamp 0 around onset of non-legato notes
+                                    if lv == 0:
+                                        bw0 = max(0, f0 - bow_change_half_width)
+                                        bw1 = min(frames_num, f0 + bow_change_half_width + 1)
+                                        legato_roll[bw0:bw1] = 0
+
+                data_dict['tonal_technique'] = tonal_roll
+                data_dict['articulation'] = artic_roll
+                data_dict['legato'] = legato_roll
+            else:
+                # Legacy mosapt: single technique from filename as one-hot
+                technique_name = self._extract_technique_name(hdf5_name)
+                technique_one_hot = self._technique_one_hot(technique_name)
+                if 'frame_roll' in data_dict:
+                    frames_num = data_dict['frame_roll'].shape[0]
+                technique_roll = np.tile(technique_one_hot, (frames_num, 1))
+                frame_activity = np.any(target_dict['frame_roll'] > 0, axis=1)
+                no_idx = self.technique_classes.index('no_technique')
+                technique_roll[~frame_activity, :] = 0.0
+                technique_roll[~frame_activity, no_idx] = 1.0
+                data_dict['technique'] = technique_roll.astype(np.float32)
 
         return data_dict
 

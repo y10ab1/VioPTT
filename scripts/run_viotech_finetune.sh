@@ -24,7 +24,7 @@ TB="${WORKSPACE}/tb"
 # Pretrained Violin Transcriptor model path (uncomment to use)
 PRETRAIN_PATH="${WORKSPACE}/checkpoints/transcriptor_model.pth"
 
-MODEL_TAG="vioptt_viotech_v0.1"
+MODEL_TAG="vioptt_viotech_v0.1_wtech_parallel_b4_tech0.1_legatoImproved"
 cd "${WORKSPACE}/piano_transcription"
 
 # --- 1. Train note transcription system ---
@@ -47,4 +47,4 @@ python3 pytorch/main_contrast.py train \
     --contrast_weight=0.0 \
     --ctc_weight=0.0 \
     --num_workers=8 \
-    # --technique_weight=1.0 
+    --technique_weight=0.1
