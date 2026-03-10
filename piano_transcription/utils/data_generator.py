@@ -272,7 +272,12 @@ class Sampler(object):
         n = 0
         for hdf5_path in hdf5_paths:
             with h5py.File(hdf5_path, 'r') as hf:
-                if hf.attrs['split'].decode() == split:
+                if 'split' not in hf.attrs:
+                    continue
+                attr = hf.attrs['split']
+                if isinstance(attr, bytes):
+                    attr = attr.decode()
+                if attr == split:
                     audio_name = hdf5_path.split('/')[-1]
                     year = hf.attrs['year'].decode()
                     start_time = 0
@@ -354,7 +359,12 @@ class TestSampler(object):
         n = 0
         for hdf5_path in hdf5_paths:
             with h5py.File(hdf5_path, 'r') as hf:
-                if hf.attrs['split'].decode() == split:
+                if 'split' not in hf.attrs:
+                    continue
+                attr = hf.attrs['split']
+                if isinstance(attr, bytes):
+                    attr = attr.decode()
+                if attr == split:
                     audio_name = hdf5_path.split('/')[-1]
                     year = hf.attrs['year'].decode()
                     start_time = 0
@@ -450,7 +460,12 @@ class CustomSampler(object):
         n = 0
         for hdf5_path in hdf5_paths:
             with h5py.File(hdf5_path, 'r') as hf:
-                if hf.attrs['split'].decode() == split:
+                if 'split' not in hf.attrs:
+                    continue
+                attr = hf.attrs['split']
+                if isinstance(attr, bytes):
+                    attr = attr.decode()
+                if attr == split:
                     audio_name = hdf5_path.split('/')[-1]
                     start_time = 0
                     while (start_time + self.segment_seconds < hf.attrs['duration']):
@@ -530,7 +545,12 @@ class CustomTestSampler(object):
         n = 0
         for hdf5_path in hdf5_paths:
             with h5py.File(hdf5_path, 'r') as hf:
-                if hf.attrs['split'].decode() == split:
+                if 'split' not in hf.attrs:
+                    continue
+                attr = hf.attrs['split']
+                if isinstance(attr, bytes):
+                    attr = attr.decode()
+                if attr == split:
                     audio_name = hdf5_path.split('/')[-1]
                     start_time = 0
                     while (start_time + self.segment_seconds < hf.attrs['duration']):

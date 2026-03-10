@@ -1,0 +1,16 @@
+{
+    "tonalTechnique": {
+        "": 0,
+        "none": 0,
+        "pizzicato": 1,
+        "harmonics": 2,
+        "openstring": 3
+    },
+    "articulation": {
+        "": 0,
+        "none": 0,
+        "release": 1,
+        "staccato": 2,
+        "spiccato": 3
+    }
+}

@@ -174,7 +174,7 @@ def train(args):
         raise Exception('Incorrect argumentation!')
     
     # Dataset & Samplers
-    if dataset in ['mosa', 'mosapt', 'mixed', 'rwc', 'rwc_tech', 'rwc_tech_note_wav']:
+    if dataset in ['mosa', 'mosapt', 'mixed', 'rwc', 'rwc_tech', 'rwc_tech_note_wav', 'viotech']:
         if dataset == 'mixed':
             # Build MOSA and MOSAPT datasets
             hdf5s_dir_mosa = os.path.join(workspace, 'hdf5s', 'mosa')
@@ -445,6 +445,51 @@ def train(args):
                 train_sampler = None
                 evaluate_train_sampler = None
                 evaluate_test_sampler = None
+            elif dataset == 'viotech':
+                # Similar to mosa/mosapt but for viotech
+                train_dataset = CustomDataset(
+                    hdf5s_dir=hdf5s_dir,
+                    segment_seconds=segment_seconds,
+                    frames_per_second=frames_per_second,
+                    max_note_shift=max_note_shift,
+                    augmentor=augmentor,
+                    include_technique_label=False, # Use False for now as per "mimic mosa"
+                )
+                evaluate_dataset = CustomDataset(
+                    hdf5s_dir=hdf5s_dir,
+                    segment_seconds=segment_seconds,
+                    frames_per_second=frames_per_second,
+                    max_note_shift=0,
+                    include_technique_label=False,
+                )
+
+                # Sampler for training
+                train_sampler = CustomSampler(
+                    hdf5s_dir=hdf5s_dir,
+                    split='train',
+                    segment_seconds=segment_seconds,
+                    hop_seconds=hop_seconds,
+                    batch_size=batch_size,
+                    mini_data=mini_data,
+                )
+
+                # Samplers for evaluation (single dataset case only)
+                evaluate_train_sampler = CustomTestSampler(
+                    hdf5s_dir=hdf5s_dir,
+                    split='train',
+                    segment_seconds=segment_seconds,
+                    hop_seconds=hop_seconds,
+                    batch_size=batch_size,
+                    mini_data=mini_data,
+                )
+                evaluate_test_sampler = CustomTestSampler(
+                    hdf5s_dir=hdf5s_dir,
+                    split='test',
+                    segment_seconds=segment_seconds,
+                    hop_seconds=hop_seconds,
+                    batch_size=batch_size,
+                    mini_data=mini_data,
+                )
             else:
                 train_dataset = CustomDataset(
                     hdf5s_dir=hdf5s_dir,
@@ -820,7 +865,7 @@ if __name__ == '__main__':
     parser_train.add_argument('--mini_data', action='store_true', default=False)
     parser_train.add_argument('--device', type=int, default=None, help='-1 for CPU, 0 for GPU 0, 1 for GPU 1, etc.')
     parser_train.add_argument('--pretrain_path', type=str, default=None)
-    parser_train.add_argument('--dataset', type=str, choices=['mosa', 'maestro', 'mosapt', 'mixed', 'rwc', 'rwc_tech', 'rwc_tech_note_wav'], default='mosa')
+    parser_train.add_argument('--dataset', type=str, choices=['mosa', 'maestro', 'mosapt', 'mixed', 'rwc', 'rwc_tech', 'rwc_tech_note_wav', 'viotech'], default='mosa')
     parser_train.add_argument('--logdir', type=str, required=True)
     parser_train.add_argument('--model_tag', type=str, required=True)
     parser_train.add_argument('--contrast_weight', type=float, default=0.0)

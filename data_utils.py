@@ -7,8 +7,7 @@ from scipy.io import loadmat
 
 def get_song_folders_bach10():
     """Get all song folders in Bach10 dataset."""
-    # dataset_dir = "/mnt/gestalt/home/tkwang/ViolinMamba/Bach10"
-    dataset_dir = "/home/yuehpo/coding/violin-mamba/Bach10_v1.1"
+    dataset_dir = Path(os.getenv("BACH10_DIR", "/home/yuehpo/coding/violin-mamba/Bach10_v1.1"))
     song_folders = []
     for item in os.listdir(dataset_dir):
         item_path = os.path.join(dataset_dir, item)
@@ -32,7 +31,6 @@ def get_song_folders_bach10():
     return song_folders
 
 def get_song_folders_bvd(): # Bach-Violin-Dataset
-
 
     bvd_path = Path("/mnt/gestalt/home/tkwang/ViolinMamba/bach-violin-dataset/bach-violin")
     bvd_audio_path = bvd_path / "audio"
@@ -75,12 +73,9 @@ def get_song_folders_bvd(): # Bach-Violin-Dataset
     return song_folders
 
 def get_song_folders_urmp(): # URMP Dataset
+    urmp_path = Path(os.getenv("URMP_DIR", "/home/yuehpo/coding/violin-mamba/URMP/Processed/Dataset"))
 
-
-    # urmp_path = Path("/mnt/gestalt/database/URMP/Source/Dataset")
-    urmp_path = Path("/home/yuehpo/coding/violin-mamba/URMP/Processed/Dataset")
-
-# Recursively find all files matching Notes_*.txt in parent directories using pathlib
+    # Recursively find all files matching Notes_*.txt in parent directories using pathlib
     note_files = list(urmp_path.rglob("Notes_*.txt"))
     tatal_song = len(note_files)
     total_song_get = 0
