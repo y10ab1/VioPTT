@@ -11,10 +11,7 @@ import logging
 from sklearn import metrics
 
 from pytorch_utils import forward_dataloader
-
-
-# Default technique class names aligned with dataset one-hot order
-_DEFAULT_TECHNIQUE_NAMES = ['flageolet', 'normal', 'pizzicato', 'spiccato', 'no_technique']
+from losses import tonal_technique_loss, articulation_loss, legato_loss
 
 def mae(target, output, mask):
     if mask is None:
@@ -90,84 +87,6 @@ class SegmentEvaluator(object):
             _, on_mask = _align_time(output_dict['velocity_output'], output_dict['onset_roll'])
             statistics['velocity_mae'] = mae(v_pred, v_true / 128, on_mask)
 
-        # Technique prediction accuracy (requires dataloader to include 'technique')
-        if ('technique_output' in output_dict.keys()) and ('technique' in output_dict.keys()):
-            try:
-                tech_probs = output_dict['technique_output']  # (N, T_pred, C)
-                tech_targets = output_dict['technique']       # (N, T_tgt, C) one-hot
-
-                # Align time dimension first
-                min_T = min(tech_probs.shape[1], tech_targets.shape[1])
-                tech_probs = tech_probs[:, :min_T, :]
-                tech_targets = tech_targets[:, :min_T, :]
-
-                # Predicted and target class indices
-                tech_pred_full = np.argmax(tech_probs, axis=-1)           # (N, T)
-                tech_true_full = np.argmax(tech_targets, axis=-1)         # (N, T)
-
-                # If available, select only labeled positions from predictions; labels already contain only labeled rows
-                if 'technique_available' in output_dict.keys():
-                    avail = output_dict['technique_available'].astype(bool)
-                    # Align avail time dimension
-                    if avail.shape[1] != min_T:
-                        avail = avail[:, :min_T]
-                    # Apply mask to both prediction and target
-                    tech_pred = tech_pred_full[avail]
-                    tech_true = tech_true_full[avail]
-                else:
-                    # No availability mask, use all positions
-                    tech_pred = tech_pred_full.reshape(-1)
-                    tech_true = tech_true_full.reshape(-1)
-
-                # Overall accuracy across all frames
-                if tech_true.size > 0:
-                    statistics['technique_acc_overall'] = (tech_pred == tech_true).mean()
-
-                # Accuracy on active frames only (exclude silent frames)
-                if 'frame_roll' in output_dict.keys():
-                    frame_activity_full = (output_dict['frame_roll'].sum(axis=2) > 0)  # (N, T_fr)
-                    # Align time
-                    if frame_activity_full.shape[1] != min_T:
-                        frame_activity_full = frame_activity_full[:, :min_T]
-                    if 'technique_available' in output_dict.keys():
-                        # activity where labels available
-                        activity_mask = frame_activity_full & avail
-                        activity_flat = activity_mask.reshape(-1)
-                        if activity_flat.any():
-                            pred_all = tech_pred_full.reshape(-1)
-                            true_all = tech_true_full.reshape(-1)
-                            statistics['technique_acc_active_frame'] = (pred_all[activity_flat] == true_all[activity_flat]).mean()
-                    else:
-                        activity_flat = frame_activity_full.reshape(-1)
-                        if activity_flat.any():
-                            statistics['technique_acc_active_frame'] = (tech_pred[activity_flat] == tech_true[activity_flat]).mean()
-
-                # Per-class accuracy (overall and active-only) with human-friendly names
-                num_classes = tech_targets.shape[-1]
-                if num_classes == len(_DEFAULT_TECHNIQUE_NAMES):
-                    class_names = _DEFAULT_TECHNIQUE_NAMES
-                else:
-                    class_names = [f'c{c}' for c in range(num_classes)]
-
-                for c in range(num_classes):
-                    name = class_names[c]
-                    cls_mask = (tech_true == c)
-                    if cls_mask.any():
-                        statistics[f'technique_acc_overall_{name}'] = (tech_pred[cls_mask] == tech_true[cls_mask]).mean()
-                    else:
-                        statistics[f'technique_acc_overall_{name}'] = 0.0
-
-                    if 'frame_roll' in output_dict.keys():
-                        if 'activity_labeled' in locals():
-                            cls_active_mask = cls_mask & activity_labeled
-                            if cls_active_mask.any():
-                                statistics[f'technique_acc_active_frame_{name}'] = (tech_pred[cls_active_mask] == tech_true[cls_active_mask]).mean()
-                            else:
-                                statistics[f'technique_acc_active_frame_{name}'] = 0.0
-            except Exception as e:
-                # Be robust to shape issues without breaking evaluation
-                logging.warning(f"Technique accuracy computation failed: {e}")
-
         if 'reg_pedal_onset_output' in output_dict.keys():
             statistics['reg_pedal_onset_mae'] = mae(
                 output_dict['reg_pedal_onset_roll'].flatten(), 
@@ -185,6 +104,20 @@ class SegmentEvaluator(object):
                 output_dict['pedal_frame_output'].flatten(), 
                 output_dict['pedal_frame_roll'].flatten(), 
                 mask=None)
+
+        # Technique losses (viotech 3-head)
+        _tech_keys_present = (
+            'tonal_technique_output' in output_dict
+            and 'tonal_technique' in output_dict
+        )
+        if _tech_keys_present:
+            _to = lambda a: torch.from_numpy(a)
+            _od = {k: _to(output_dict[k]) for k in output_dict if k.endswith('_output')}
+            _td = {k: _to(output_dict[k]) for k in ('tonal_technique', 'articulation',
+                    'legato', 'frame_roll') if k in output_dict}
+            statistics['loss_tonal_technique'] = tonal_technique_loss(_od, _td).item()
+            statistics['loss_articulation'] = articulation_loss(_od, _td).item()
+            statistics['loss_legato'] = legato_loss(_od, _td).item()
 
         for key in statistics.keys():
             statistics[key] = np.around(statistics[key], decimals=4)
