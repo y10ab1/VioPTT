@@ -121,21 +121,6 @@ class PianoTranscription(object):
           'reg_pedal_offset_output': (segment_frames, 1), 
           'pedal_frame_output': (segment_frames, 1)}"""
         
-        # print(f"output_dict keys: {output_dict.keys()}") # ['reg_onset_output', 'reg_offset_output', 'frame_output', 'velocity_output', 'onset_output', 'onset_shift_output', 'offset_output', 'offset_shift_output']
-        # print(f"output_dict reg_onset_output shape: {output_dict['reg_onset_output'].shape}") # (14000, 88)
-        # print(f"output_dict reg_onset_output: {output_dict['reg_onset_output']}")
-        # a=input("Press Enter to continue !!!!!! ...")
-
-        # # Visualize reg_onset_output by TK
-        # plt.figure(figsize=(10, 6))
-        # plt.imshow(output_dict['reg_onset_output'].T, aspect='auto', origin='lower', cmap='viridis')
-        # plt.colorbar(label='Prediction Intensity')
-        # plt.xlabel('Frames')
-        # plt.ylabel('Keys')
-        # plt.title('reg_onset_output Heatmap')
-        # plt.savefig('reg_onset_output.png')
-        # print(f"Saved reg_onset_output.png")
-
         # Post processor
         if self.post_processor_type == 'regression':
             """Proposed high-resolution regression post processing algorithm."""
@@ -154,22 +139,6 @@ class PianoTranscription(object):
         # Post process output_dict to MIDI events
         (est_note_events, est_pedal_events) = \
             post_processor.output_dict_to_midi_events(output_dict)
-
-        # Add technique support for multi-track MIDI when requested
-        if apply_technique:
-            note_events_with_technique, _ = add_technique_support(output_dict, post_processor)
-        else:
-            note_events_with_technique = None
-
-        # Write MIDI events to file
-        if midi_path:
-            if apply_technique and note_events_with_technique is not None:
-                write_events_to_midi_with_technique(start_time=0, note_events=note_events_with_technique, 
-                    pedal_events=est_pedal_events, midi_path=midi_path)
-            else:
-                write_events_to_midi(start_time=0, note_events=est_note_events, 
-                    pedal_events=est_pedal_events, midi_path=midi_path)
-            print('Write out to {}'.format(midi_path))
 
         transcribed_dict = {
             'output_dict': output_dict, 

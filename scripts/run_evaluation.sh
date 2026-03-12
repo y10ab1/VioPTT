@@ -7,7 +7,7 @@ WORKSPACE="${PROJECT_ROOT}"
 
 # Path to trained model checkpoint
 # CHECKPOINT_PATH="${WORKSPACE}/checkpoints/transcriptor_model.pth"
-CHECKPOINT_PATH="/root/VioPTT/checkpoints/main_contrast/vioptt_viotech_v0.1/Regress_onset_offset_frame_velocity_CRNN/loss_type=regress_onset_offset_frame_velocity_bce/augmentation=aug/max_note_shift=2/batch_size=4/2000_iterations.pth"
+CHECKPOINT_PATH="/root/VioPTT/checkpoints/main_contrast/vioptt_viotech_v0.1/Regress_onset_offset_frame_velocity_CRNN/loss_type=regress_onset_offset_frame_velocity_bce/augmentation=aug/max_note_shift=2/batch_size=4/0_iterations.pth"
 
 # Model type (adjust based on your model)
 MODEL_TYPE="Regress_onset_offset_frame_velocity_CRNN"
@@ -17,7 +17,7 @@ POST_PROCESSOR="regression"  # or "onsets_frames""
 
 # Model tag
 # MODEL_TAG="transcriptor_model"
-MODEL_TAG="vioptt_viotech_v0.1_2000"
+MODEL_TAG="vioptt_viotech_v0.1_0"
 
 # Set environment variables
 export BACH10_DIR="/mnt/hdd/Bach10"

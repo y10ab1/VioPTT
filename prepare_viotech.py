@@ -40,18 +40,18 @@ def get_mapped_value(value, mapping):
     return mapping.get(value, 0)
 
 def process_song(song_folder, output_dir, mapping, target_sr=None):
-    # Check status.json
-    status_path = os.path.join(song_folder, "status.json")
-    if not os.path.exists(status_path):
-        return None
+    # # Check status.json
+    # status_path = os.path.join(song_folder, "status.json")
+    # if not os.path.exists(status_path):
+    #     return None
     
-    try:
-        with open(status_path, 'r') as f:
-            status = json.load(f)
-            if not status.get("completed", False):
-                return None
-    except Exception:
-        return None
+    # try:
+    #     with open(status_path, 'r') as f:
+    #         status = json.load(f)
+    #         if not status.get("completed", False):
+    #             return None
+    # except Exception:
+    #     return None
 
     # Find required files
     wav_files = glob.glob(os.path.join(song_folder, "*_cut.wav"))
@@ -207,7 +207,7 @@ def process_song(song_folder, output_dir, mapping, target_sr=None):
 def main():
     parser = argparse.ArgumentParser(description="Convert raw dataset to H5 for Viotech")
     parser.add_argument("--data_dir", default="/mnt/hdd/audio-midi-marker/data", help="Root directory of raw data")
-    parser.add_argument("--output_dir", default="/mnt/hdd/viotech", help="Output directory for H5 files")
+    parser.add_argument("--output_dir", default="/mnt/hdd/viotech_raw", help="Output directory for H5 files")
     parser.add_argument("--mapping_file", default="mapping_config.json", help="Path to JSON mapping file")
     parser.add_argument("--target_sr", type=int, default=16000, help="Target sample rate for resampling (default: 16000)")
     
