@@ -18,6 +18,10 @@ try:
 except ImportError:
     NoteWiseTechniqueHead = None
 
+from note_slicer import NoteSlicer, NoteSlicerConfig
+from moe_technique import MoETechniqueHead, MoEConfig
+from moe_zone_specialist import ZoneMoETechniqueHead, ZoneMoEConfig
+
 
 def init_layer(layer):
     """Initialize a Linear or Convolutional layer. """
@@ -206,7 +210,10 @@ class FrameLevelTechniqueHead(nn.Module):
 
 
 class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
-    def __init__(self, frames_per_second, classes_num, output_features=False, predict_technique=False):
+    def __init__(self, frames_per_second, classes_num, output_features=False,
+                 predict_technique=False, predict_technique_moe=False,
+                 predict_technique_moe_zone=False,
+                 moe_config=None, zone_moe_config=None, slicer_config=None):
         super(Regress_onset_offset_frame_velocity_CRNN, self).__init__()
 
         sample_rate = 16000
@@ -227,6 +234,8 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
         momentum = 0.01
         technique_classes_num = 5
         self.predict_technique = predict_technique
+        self.predict_technique_moe = predict_technique_moe
+        self.predict_technique_moe_zone = predict_technique_moe_zone
 
         # Spectrogram extractor
         self.spectrogram_extractor = Spectrogram(n_fft=window_size, 
@@ -244,14 +253,30 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
         self.reg_onset_model = AcousticModelCRnn8Dropout(classes_num, midfeat, momentum, output_features)
         self.reg_offset_model = AcousticModelCRnn8Dropout(classes_num, midfeat, momentum, output_features)
         self.velocity_model = AcousticModelCRnn8Dropout(classes_num, midfeat, momentum, output_features)
+
+        # Frame-level technique branch (original)
         if self.predict_technique:
             self.technique_acoustic = AcousticModelCRnn8Dropout(
                 classes_num, midfeat, momentum, output_features=True)
             self.technique_head = FrameLevelTechniqueHead(
-                in_features=512,       # bidirectional GRU hidden dim from technique_acoustic
+                in_features=512,
                 num_tonal_classes=4,
                 num_artic_classes=4,
             )
+
+        # Note-level MoE technique branch
+        if self.predict_technique_moe:
+            self.technique_acoustic_moe = AcousticModelCRnn8Dropout(
+                classes_num, midfeat, momentum, output_features=True)
+            self.note_slicer = NoteSlicer(slicer_config or NoteSlicerConfig())
+            self.moe_technique_head = MoETechniqueHead(moe_config or MoEConfig())
+
+        # Zone-Specialized MoE technique branch
+        if self.predict_technique_moe_zone:
+            self.technique_acoustic_zone = AcousticModelCRnn8Dropout(
+                classes_num, midfeat, momentum, output_features=True)
+            self.note_slicer_zone = NoteSlicer(slicer_config or NoteSlicerConfig())
+            self.zone_moe_head = ZoneMoETechniqueHead(zone_moe_config or ZoneMoEConfig())
 
         self.reg_onset_gru = nn.GRU(input_size=88 * 2, hidden_size=256, num_layers=1, 
             bias=True, batch_first=True, dropout=0., bidirectional=True)
@@ -276,18 +301,15 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
         init_layer(self.reg_onset_fc)
         init_layer(self.frame_fc)
 
-    def forward(self, input):
+    def forward(self, input, note_info=None):
         """
         Args:
           input: (batch_size, data_length)
+          note_info: optional dict for MoE technique branch, with keys
+              'onset_frames' (B, N), 'offset_frames' (B, N), 'num_notes' (B,)
 
         Outputs:
-          output_dict: dict, {
-            'reg_onset_output': (batch_size, time_steps, classes_num),
-            'reg_offset_output': (batch_size, time_steps, classes_num),
-            'frame_output': (batch_size, time_steps, classes_num),
-            'velocity_output': (batch_size, time_steps, classes_num)
-          }
+          output_dict: dict
         """
 
         x = self.spectrogram_extractor(input)   # (batch_size, 1, time_steps, freq_bins)
@@ -297,8 +319,8 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
         x = self.bn0(x)
         x = x.transpose(1, 3)
 
-        if self.predict_technique:
-            logmel = x  # save (B, 1, T, mel_bins) before x gets overwritten
+        if self.predict_technique or self.predict_technique_moe or self.predict_technique_moe_zone:
+            logmel = x
 
         if self.output_features:
             frame_output, frame_features = self.frame_model(x)
@@ -306,28 +328,26 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
             reg_offset_output, reg_offset_features = self.reg_offset_model(x)
             velocity_output, velocity_features = self.velocity_model(x)
         else:
-            frame_output = self.frame_model(x)  # (batch_size, time_steps, classes_num)
-            reg_onset_output = self.reg_onset_model(x)  # (batch_size, time_steps, classes_num)
-            reg_offset_output = self.reg_offset_model(x)    # (batch_size, time_steps, classes_num)
-            velocity_output = self.velocity_model(x)    # (batch_size, time_steps, classes_num)
+            frame_output = self.frame_model(x)
+            reg_onset_output = self.reg_onset_model(x)
+            reg_offset_output = self.reg_offset_model(x)
+            velocity_output = self.velocity_model(x)
 
         # Use velocities to condition onset regression
         x = torch.cat((reg_onset_output, (reg_onset_output ** 0.5) * velocity_output.detach()), dim=2)
         (x, _) = self.reg_onset_gru(x)
         x = F.dropout(x, p=0.5, training=self.training, inplace=False)
         reg_onset_output = torch.sigmoid(self.reg_onset_fc(x))
-        """(batch_size, time_steps, classes_num)"""
 
         # Use onsets and offsets to condition frame-wise classification
         x = torch.cat((frame_output, reg_onset_output.detach(), reg_offset_output.detach()), dim=2)
         (x, _) = self.frame_gru(x)
         x = F.dropout(x, p=0.5, training=self.training, inplace=False)
-        frame_output = torch.sigmoid(self.frame_fc(x))  # (batch_size, time_steps, classes_num)
-        """(batch_size, time_steps, classes_num)"""
+        frame_output = torch.sigmoid(self.frame_fc(x))
 
-        # Technique branch: dedicated acoustic encoder on the same log-mel
+        # Frame-level technique branch
         if self.predict_technique:
-            _, tech_features = self.technique_acoustic(logmel)  # (B, T, 512)
+            _, tech_features = self.technique_acoustic(logmel)
             tonal_output, artic_output, legato_output = self.technique_head(tech_features)
 
         output_dict = {
@@ -343,9 +363,57 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
             output_dict['velocity_features'] = velocity_features
         
         if self.predict_technique:
-            output_dict['tonal_technique_output'] = tonal_output    # (B, T, 4) logits
-            output_dict['articulation_output'] = artic_output       # (B, T, 4) logits
-            output_dict['legato_output'] = legato_output            # (B, T, 1) sigmoid
+            output_dict['tonal_technique_output'] = tonal_output
+            output_dict['articulation_output'] = artic_output
+            output_dict['legato_output'] = legato_output
+
+        # Note-level MoE technique branch
+        if self.predict_technique_moe and note_info is not None:
+            _, moe_features = self.technique_acoustic_moe(logmel)  # (B, T, 512)
+            N = note_info['onset_frames'].shape[1]
+            device = moe_features.device
+            note_mask = (
+                torch.arange(N, device=device).unsqueeze(0)
+                < note_info['num_notes'].unsqueeze(1)
+            )
+            zone_feats = self.note_slicer(
+                moe_features,
+                note_info['onset_frames'],
+                note_info['offset_frames'],
+                note_mask,
+            )
+            tonal_logits, artic_logits, legato_prob, gate_probs = \
+                self.moe_technique_head(zone_feats)
+
+            output_dict['note_tonal_logits'] = tonal_logits
+            output_dict['note_artic_logits'] = artic_logits
+            output_dict['note_legato_prob']  = legato_prob
+            output_dict['moe_gate_probs']    = gate_probs
+
+        # Zone-Specialized MoE technique branch
+        if self.predict_technique_moe_zone and note_info is not None:
+            _, zone_features = self.technique_acoustic_zone(logmel)
+            N_z = note_info['onset_frames'].shape[1]
+            dev = zone_features.device
+            zone_mask = (
+                torch.arange(N_z, device=dev).unsqueeze(0)
+                < note_info['num_notes'].unsqueeze(1)
+            )
+            zone_feats = self.note_slicer_zone(
+                zone_features,
+                note_info['onset_frames'],
+                note_info['offset_frames'],
+                zone_mask,
+            )
+            pitches = note_info.get('pitches', None)
+            durations = note_info.get('durations', None)
+            zt_logits, za_logits, zl_prob, zg_probs = \
+                self.zone_moe_head(zone_feats, pitches=pitches, durations=durations)
+
+            output_dict['zone_tonal_logits'] = zt_logits
+            output_dict['zone_artic_logits'] = za_logits
+            output_dict['zone_legato_prob']  = zl_prob
+            output_dict['zone_gate_probs']   = zg_probs
 
         return output_dict
 

@@ -173,6 +173,26 @@ def viotech_technique_losses(output_dict, target_dict, device=None, use_active_m
     loss_leg = legato_loss(output_dict, target_dict, device, use_active_mask)
     return loss_tonal, loss_artic, loss_leg
 
+def moe_technique_losses(output_dict, target_dict, device=None):
+    """Note-level MoE technique losses (tonal + artic + legato + balance).
+
+    Delegates to moe_technique.moe_note_technique_losses.
+    Returns (loss_tonal, loss_artic, loss_legato, loss_balance).
+    """
+    from moe_technique import moe_note_technique_losses
+    return moe_note_technique_losses(output_dict, target_dict, device=device)
+
+
+def zone_moe_technique_losses(output_dict, target_dict, device=None):
+    """Note-level Zone-Specialized MoE technique losses.
+
+    Delegates to moe_zone_specialist.zone_moe_note_technique_losses.
+    Returns (loss_tonal, loss_artic, loss_legato, loss_balance).
+    """
+    from moe_zone_specialist import zone_moe_note_technique_losses
+    return zone_moe_note_technique_losses(output_dict, target_dict, device=device)
+
+
 def technique_aux_frame_ce_loss(aux_technique_model, output_dict, target_dict, device=None):
     """Auxiliary frame-level technique classification loss.
 

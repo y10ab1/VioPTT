@@ -596,6 +596,9 @@ class CustomTestSampler(object):
         return -1
 
 
+MAX_NOTES_PER_SEGMENT = 128
+
+
 class CustomDataset(object):
     def __init__(self, hdf5s_dir, segment_seconds, frames_per_second, 
         max_note_shift=0, augmentor=None, include_technique_label=False):
@@ -620,6 +623,7 @@ class CustomDataset(object):
         self.segment_samples = int(self.sample_rate * self.segment_seconds)
         self.augmentor = augmentor
         self.include_technique_label = include_technique_label
+        self.max_notes = MAX_NOTES_PER_SEGMENT
         # Fixed order of technique classes for one-hot encoding (5 classes including no_technique)
         # self.technique_classes = ['legato', 'pizzicato', 'spiccato', 'sustain', 'no_technique']
         self.technique_classes = ['flageolet', 'normal', 'pizzicato', 'spiccato', 'no_technique']
@@ -715,11 +719,20 @@ class CustomDataset(object):
             if has_viotech:
                 tonal_roll = np.zeros(frames_num, dtype=np.int32)
                 artic_roll = np.zeros(frames_num, dtype=np.int32)
-                # legato_roll: 1 = sustained (no bow change), 0 = bow change at onset
                 legato_roll = np.ones(frames_num, dtype=np.int32)
-                bow_change_half_width = 2  # ±2 frames (~±20ms at 100fps)
+                bow_change_half_width = 2
 
-                pending = {}  # pitch -> (onset_time, tonal, artic, legato)
+                # Note-level arrays (padded to max_notes)
+                MN = self.max_notes
+                note_onset_frames  = np.zeros(MN, dtype=np.int32)
+                note_offset_frames = np.zeros(MN, dtype=np.int32)
+                note_pitches       = np.zeros(MN, dtype=np.int32)
+                note_tonal         = np.zeros(MN, dtype=np.int32)
+                note_artic         = np.zeros(MN, dtype=np.int32)
+                note_leg           = np.zeros(MN, dtype=np.int32)
+                note_count = 0
+
+                pending = {}
                 for i, evt_str in enumerate(evt_strings):
                     if 'note_on' in evt_str:
                         for tok in evt_str.split():
@@ -745,15 +758,33 @@ class CustomDataset(object):
                                 if f1 > f0:
                                     tonal_roll[f0:f1] = tv
                                     artic_roll[f0:f1] = av
-                                    # Bow change: stamp 0 around onset of non-legato notes
                                     if lv == 0:
                                         bw0 = max(0, f0 - bow_change_half_width)
                                         bw1 = min(frames_num, f0 + bow_change_half_width + 1)
                                         legato_roll[bw0:bw1] = 0
+                                    # Collect note-level label
+                                    if note_count < MN:
+                                        note_onset_frames[note_count] = f0
+                                        note_offset_frames[note_count] = f1
+                                        note_pitches[note_count] = pitch
+                                        note_tonal[note_count] = tv
+                                        note_artic[note_count] = av
+                                        note_leg[note_count] = lv
+                                        note_count += 1
 
+                # Frame-level rolls (backward compatible)
                 data_dict['tonal_technique'] = tonal_roll
                 data_dict['articulation'] = artic_roll
                 data_dict['legato'] = legato_roll
+
+                # Note-level arrays for MoE technique head
+                data_dict['note_onset_frames']    = note_onset_frames
+                data_dict['note_offset_frames']   = note_offset_frames
+                data_dict['note_pitches']         = note_pitches
+                data_dict['note_tonal_technique'] = note_tonal
+                data_dict['note_articulation']    = note_artic
+                data_dict['note_legato']          = note_leg
+                data_dict['num_notes']            = np.int32(note_count)
             else:
                 # Legacy mosapt: single technique from filename as one-hot
                 technique_name = self._extract_technique_name(hdf5_name)
