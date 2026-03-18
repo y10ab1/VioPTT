@@ -5,12 +5,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 WORKSPACE="${PROJECT_ROOT}"
 
-# Training with Zone-Specialized MoE technique classification
-# Expert 0: Onset specialist (onset + ctx_prev)
-# Expert 1: Body specialist  (body)
-# Expert 2: Offset specialist (offset + ctx_next)
-# Expert 3: Holistic expert  (all zones)
-# Includes pitch embedding and log-duration features.
+# Training with Frame-level Multi-Scale MoE technique classification (end-to-end)
+# Expert 0: Onset specialist  (~110ms + onset prob)
+# Expert 1: Note specialist   (~510ms + frame activity)
+# Expert 2: Phrase specialist  (~1.5s  + all cues)
+# No GT note boundaries required — uses transcription branch cues.
+# Per-task gating (tonal / articulation / legato), top-k=2 sparse, low balance.
 
 if [ ! -d "${WORKSPACE}/hdf5s/viotech" ]; then
     mkdir -p "${WORKSPACE}/hdf5s"
@@ -20,7 +20,7 @@ fi
 
 TB="${WORKSPACE}/tb"
 PRETRAIN_PATH="${WORKSPACE}/checkpoints/transcriptor_model.pth"
-MODEL_TAG="vioptt_viotech_moe_zone_nonbalance_v0.1"
+MODEL_TAG="vioptt_viotech_frame_moe_v0.1"
 
 cd "${WORKSPACE}/piano_transcription"
 
@@ -38,12 +38,14 @@ python3 pytorch/main_contrast.py train \
     --reduce_iteration=1000 \
     --resume_iteration=0 \
     --early_stop=10000 \
-    --device 2 \
+    --device 0 \
     --dataset viotech \
     --contrast_weight=0.0 \
     --ctc_weight=0.0 \
     --num_workers=8 \
     --technique_weight=0.0 \
     --technique_moe_weight=0.0 \
-    --technique_moe_zone_weight=0.1 \
-    --moe_zone_balance_coeff=0.00
+    --technique_moe_zone_weight=0.0 \
+    --technique_moe_zone_pt_weight=0.0 \
+    --technique_frame_moe_weight=0.1 \
+    --frame_moe_balance_coeff=0.001

@@ -32,6 +32,8 @@ from losses import (
     viotech_technique_losses,
     moe_technique_losses,
     zone_moe_technique_losses,
+    pertask_zone_moe_technique_losses,
+    frame_multiscale_moe_losses,
 )
 from evaluate import SegmentEvaluator
 import config
@@ -88,9 +90,15 @@ def train(args):
     moe_balance_coeff = getattr(args, 'moe_balance_coeff', 0.01)
     technique_moe_zone_weight = getattr(args, 'technique_moe_zone_weight', 0.0)
     moe_zone_balance_coeff = getattr(args, 'moe_zone_balance_coeff', 0.01)
+    technique_moe_zone_pt_weight = getattr(args, 'technique_moe_zone_pt_weight', 0.0)
+    moe_zone_pt_balance_coeff = getattr(args, 'moe_zone_pt_balance_coeff', 0.001)
+    technique_frame_moe_weight = getattr(args, 'technique_frame_moe_weight', 0.0)
+    frame_moe_balance_coeff = getattr(args, 'frame_moe_balance_coeff', 0.001)
     print('technique weight: ', technique_weight)
     print('technique MoE weight: ', technique_moe_weight)
     print('technique MoE-Zone weight: ', technique_moe_zone_weight)
+    print('technique MoE-Zone-PerTask weight: ', technique_moe_zone_pt_weight)
+    print('technique Frame-MoE weight: ', technique_frame_moe_weight)
 
     sample_rate = config.sample_rate
     segment_seconds = config.segment_seconds
@@ -171,6 +179,8 @@ def train(args):
         predict_technique=(technique_weight > 0),
         predict_technique_moe=(technique_moe_weight > 0),
         predict_technique_moe_zone=(technique_moe_zone_weight > 0),
+        predict_technique_moe_zone_pt=(technique_moe_zone_pt_weight > 0),
+        predict_technique_frame_moe=(technique_frame_moe_weight > 0),
     )
     aux_contrast_onset_model = nn.Linear(512, 128)
     aux_contrast_offset_model = nn.Linear(512, 128)
@@ -692,7 +702,7 @@ def train(args):
     for batch_data_dict in train_loader:
 
         # Evaluation 
-        if iteration % 10 == 0:# and iteration > 0:
+        if iteration % 100 == 0:# and iteration > 0:
             logging.info('------------------------------------')
             logging.info('Iteration: {}'.format(iteration))
 
@@ -783,7 +793,8 @@ def train(args):
         else:
             # Build note_info for MoE technique branches if available
             note_info = None
-            need_note_info = (technique_moe_weight > 0 or technique_moe_zone_weight > 0)
+            need_note_info = (technique_moe_weight > 0 or technique_moe_zone_weight > 0
+                              or technique_moe_zone_pt_weight > 0)
             if need_note_info and 'note_onset_frames' in batch_data_dict:
                 onset_f = batch_data_dict['note_onset_frames'].long()
                 offset_f = batch_data_dict['note_offset_frames'].long()
@@ -836,6 +847,24 @@ def train(args):
                 zone_moe_technique_losses(batch_output_dict, batch_data_dict, device=device)
             loss_zone_moe_technique = zone_tonal + zone_artic + zone_legato
 
+        # Per-Task Gate Zone MoE technique losses
+        loss_pt_moe_technique = torch.tensor(0.0, device=device)
+        loss_pt_moe_balance = torch.tensor(0.0, device=device)
+        pt_tonal = pt_artic = pt_legato = None
+        if technique_moe_zone_pt_weight > 0 and 'pt_tonal_logits' in batch_output_dict:
+            pt_tonal, pt_artic, pt_legato, loss_pt_moe_balance = \
+                pertask_zone_moe_technique_losses(batch_output_dict, batch_data_dict, device=device)
+            loss_pt_moe_technique = pt_tonal + pt_artic + pt_legato
+
+        # Frame-level Multi-Scale MoE technique losses
+        loss_frame_moe_technique = torch.tensor(0.0, device=device)
+        loss_frame_moe_balance = torch.tensor(0.0, device=device)
+        fmoe_tonal = fmoe_artic = fmoe_legato = None
+        if technique_frame_moe_weight > 0 and 'fmoe_tonal_logits' in batch_output_dict:
+            fmoe_tonal, fmoe_artic, fmoe_legato, loss_frame_moe_balance = \
+                frame_multiscale_moe_losses(batch_output_dict, batch_data_dict, device=device)
+            loss_frame_moe_technique = fmoe_tonal + fmoe_artic + fmoe_legato
+
         if contrast_weight > 0:
             loss_contrast = onset_binary_supcon_loss(batch_output_dict, batch_data_dict) + offset_binary_supcon_loss(batch_output_dict, batch_data_dict)
         else:
@@ -859,7 +888,11 @@ def train(args):
                 + technique_moe_weight * loss_moe_technique
                 + moe_balance_coeff * loss_moe_balance
                 + technique_moe_zone_weight * loss_zone_moe_technique
-                + moe_zone_balance_coeff * loss_zone_moe_balance)
+                + moe_zone_balance_coeff * loss_zone_moe_balance
+                + technique_moe_zone_pt_weight * loss_pt_moe_technique
+                + moe_zone_pt_balance_coeff * loss_pt_moe_balance
+                + technique_frame_moe_weight * loss_frame_moe_technique
+                + frame_moe_balance_coeff * loss_frame_moe_balance)
 
         # Log loss to TensorBoard
         writer.add_scalar('train/loss', loss.item(), iteration)
@@ -895,6 +928,24 @@ def train(args):
                 writer.add_scalar('train/loss_zone_moe_artic', zone_artic.item(), iteration)
             if zone_legato is not None:
                 writer.add_scalar('train/loss_zone_moe_legato', zone_legato.item(), iteration)
+        if technique_moe_zone_pt_weight > 0:
+            writer.add_scalar('train/loss_pt_moe_technique', loss_pt_moe_technique.item(), iteration)
+            writer.add_scalar('train/loss_pt_moe_balance', loss_pt_moe_balance.item(), iteration)
+            if pt_tonal is not None:
+                writer.add_scalar('train/loss_pt_moe_tonal', pt_tonal.item(), iteration)
+            if pt_artic is not None:
+                writer.add_scalar('train/loss_pt_moe_artic', pt_artic.item(), iteration)
+            if pt_legato is not None:
+                writer.add_scalar('train/loss_pt_moe_legato', pt_legato.item(), iteration)
+        if technique_frame_moe_weight > 0:
+            writer.add_scalar('train/loss_frame_moe_technique', loss_frame_moe_technique.item(), iteration)
+            writer.add_scalar('train/loss_frame_moe_balance', loss_frame_moe_balance.item(), iteration)
+            if fmoe_tonal is not None:
+                writer.add_scalar('train/loss_fmoe_tonal', fmoe_tonal.item(), iteration)
+            if fmoe_artic is not None:
+                writer.add_scalar('train/loss_fmoe_artic', fmoe_artic.item(), iteration)
+            if fmoe_legato is not None:
+                writer.add_scalar('train/loss_fmoe_legato', fmoe_legato.item(), iteration)
 
         preview_loss = {
             'loss': loss.item(),
@@ -917,6 +968,12 @@ def train(args):
         if technique_moe_zone_weight > 0:
             preview_loss['loss_zmoe'] = loss_zone_moe_technique.item()
             preview_loss['loss_zmoe_bal'] = loss_zone_moe_balance.item()
+        if technique_moe_zone_pt_weight > 0:
+            preview_loss['loss_ptmoe'] = loss_pt_moe_technique.item()
+            preview_loss['loss_ptmoe_bal'] = loss_pt_moe_balance.item()
+        if technique_frame_moe_weight > 0:
+            preview_loss['loss_fmoe'] = loss_frame_moe_technique.item()
+            preview_loss['loss_fmoe_bal'] = loss_frame_moe_balance.item()
         if contrast_weight > 0:
             preview_loss['loss_contrast'] = loss_contrast.item()
         
@@ -983,6 +1040,14 @@ if __name__ == '__main__':
         help='Weight for Zone-Specialized MoE technique loss (0 = disabled)')
     parser_train.add_argument('--moe_zone_balance_coeff', type=float, default=0.01,
         help='Coefficient for Zone MoE load-balance auxiliary loss')
+    parser_train.add_argument('--technique_moe_zone_pt_weight', type=float, default=0.0,
+        help='Weight for Per-Task Gate Zone MoE technique loss (0 = disabled)')
+    parser_train.add_argument('--moe_zone_pt_balance_coeff', type=float, default=0.001,
+        help='Coefficient for Per-Task Zone MoE load-balance auxiliary loss')
+    parser_train.add_argument('--technique_frame_moe_weight', type=float, default=0.0,
+        help='Weight for Frame-level Multi-Scale MoE technique loss (0 = disabled)')
+    parser_train.add_argument('--frame_moe_balance_coeff', type=float, default=0.001,
+        help='Coefficient for Frame MoE load-balance auxiliary loss')
     args = parser.parse_args()
     args.filename = get_filename(__file__)
 

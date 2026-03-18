@@ -21,6 +21,8 @@ except ImportError:
 from note_slicer import NoteSlicer, NoteSlicerConfig
 from moe_technique import MoETechniqueHead, MoEConfig
 from moe_zone_specialist import ZoneMoETechniqueHead, ZoneMoEConfig
+from moe_zone_pertask import PerTaskZoneMoEHead, PerTaskZoneMoEConfig
+from moe_frame_multiscale import FrameMultiScaleMoEHead, FrameMultiScaleMoEConfig
 
 
 def init_layer(layer):
@@ -213,7 +215,11 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
     def __init__(self, frames_per_second, classes_num, output_features=False,
                  predict_technique=False, predict_technique_moe=False,
                  predict_technique_moe_zone=False,
-                 moe_config=None, zone_moe_config=None, slicer_config=None):
+                 predict_technique_moe_zone_pt=False,
+                 predict_technique_frame_moe=False,
+                 moe_config=None, zone_moe_config=None,
+                 pt_zone_moe_config=None, frame_moe_config=None,
+                 slicer_config=None):
         super(Regress_onset_offset_frame_velocity_CRNN, self).__init__()
 
         sample_rate = 16000
@@ -236,6 +242,8 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
         self.predict_technique = predict_technique
         self.predict_technique_moe = predict_technique_moe
         self.predict_technique_moe_zone = predict_technique_moe_zone
+        self.predict_technique_moe_zone_pt = predict_technique_moe_zone_pt
+        self.predict_technique_frame_moe = predict_technique_frame_moe
 
         # Spectrogram extractor
         self.spectrogram_extractor = Spectrogram(n_fft=window_size, 
@@ -278,6 +286,21 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
             self.note_slicer_zone = NoteSlicer(slicer_config or NoteSlicerConfig())
             self.zone_moe_head = ZoneMoETechniqueHead(zone_moe_config or ZoneMoEConfig())
 
+        # Per-Task Gate Zone MoE technique branch
+        if self.predict_technique_moe_zone_pt:
+            self.technique_acoustic_zone_pt = AcousticModelCRnn8Dropout(
+                classes_num, midfeat, momentum, output_features=True)
+            self.note_slicer_zone_pt = NoteSlicer(slicer_config or NoteSlicerConfig())
+            self.pt_zone_moe_head = PerTaskZoneMoEHead(
+                pt_zone_moe_config or PerTaskZoneMoEConfig())
+
+        # Frame-level Multi-Scale MoE technique branch (end-to-end, no GT boundaries)
+        if self.predict_technique_frame_moe:
+            self.technique_acoustic_frame_moe = AcousticModelCRnn8Dropout(
+                classes_num, midfeat, momentum, output_features=True)
+            self.frame_moe_head = FrameMultiScaleMoEHead(
+                frame_moe_config or FrameMultiScaleMoEConfig())
+
         self.reg_onset_gru = nn.GRU(input_size=88 * 2, hidden_size=256, num_layers=1, 
             bias=True, batch_first=True, dropout=0., bidirectional=True)
         self.reg_onset_fc = nn.Linear(512, classes_num, bias=True)
@@ -319,7 +342,7 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
         x = self.bn0(x)
         x = x.transpose(1, 3)
 
-        if self.predict_technique or self.predict_technique_moe or self.predict_technique_moe_zone:
+        if self.predict_technique or self.predict_technique_moe or self.predict_technique_moe_zone or self.predict_technique_moe_zone_pt or self.predict_technique_frame_moe:
             logmel = x
 
         if self.output_features:
@@ -414,6 +437,52 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
             output_dict['zone_artic_logits'] = za_logits
             output_dict['zone_legato_prob']  = zl_prob
             output_dict['zone_gate_probs']   = zg_probs
+
+        # Per-Task Gate Zone MoE technique branch
+        if self.predict_technique_moe_zone_pt and note_info is not None:
+            _, pt_features = self.technique_acoustic_zone_pt(logmel)
+            N_pt = note_info['onset_frames'].shape[1]
+            dev_pt = pt_features.device
+            pt_mask = (
+                torch.arange(N_pt, device=dev_pt).unsqueeze(0)
+                < note_info['num_notes'].unsqueeze(1)
+            )
+            pt_zone_feats = self.note_slicer_zone_pt(
+                pt_features,
+                note_info['onset_frames'],
+                note_info['offset_frames'],
+                pt_mask,
+            )
+            pitches_pt = note_info.get('pitches', None)
+            durations_pt = note_info.get('durations', None)
+            pt_t, pt_a, pt_l, gp_t, gp_a, gp_l = \
+                self.pt_zone_moe_head(pt_zone_feats,
+                                      pitches=pitches_pt, durations=durations_pt)
+
+            output_dict['pt_tonal_logits'] = pt_t
+            output_dict['pt_artic_logits'] = pt_a
+            output_dict['pt_legato_prob']  = pt_l
+            output_dict['pt_gate_tonal']   = gp_t
+            output_dict['pt_gate_artic']   = gp_a
+            output_dict['pt_gate_legato']  = gp_l
+
+        # Frame-level Multi-Scale MoE technique branch (end-to-end)
+        if self.predict_technique_frame_moe:
+            _, fmoe_features = self.technique_acoustic_frame_moe(logmel)  # (B, T, 512)
+            # Transcription structural cues — max-pool across pitches
+            onset_cue = output_dict['reg_onset_output'].max(dim=-1, keepdim=True)[0]   # (B, T, 1)
+            offset_cue = output_dict['reg_offset_output'].max(dim=-1, keepdim=True)[0]
+            frame_cue = output_dict['frame_output'].max(dim=-1, keepdim=True)[0]
+
+            fm_t, fm_a, fm_l, fg_t, fg_a, fg_l = self.frame_moe_head(
+                fmoe_features, onset_cue, offset_cue, frame_cue)
+
+            output_dict['fmoe_tonal_logits'] = fm_t
+            output_dict['fmoe_artic_logits'] = fm_a
+            output_dict['fmoe_legato_prob']  = fm_l
+            output_dict['fmoe_gate_tonal']   = fg_t
+            output_dict['fmoe_gate_artic']   = fg_a
+            output_dict['fmoe_gate_legato']  = fg_l
 
         return output_dict
 

@@ -1,8 +1,7 @@
-"""Evaluate Zone-Specialized MoE technique classification.
+"""Evaluate Per-Task Gate Zone-Specialized MoE technique classification.
 
-Supports two datasets:
-  1. Viotech  (--hdf5s_dir)  — default
-  2. RWC      (--rwc_h5_path) — optional, with label mapping
+Each task (tonal, articulation, legato) has its own independent gate, so
+gate usage is reported per-task instead of a single global gate.
 
 Expert roles:
   Expert 0 = Onset specialist (onset + ctx_prev)
@@ -10,19 +9,9 @@ Expert roles:
   Expert 2 = Offset specialist (offset + ctx_next)
   Expert 3 = Holistic expert  (all zones)
 
-Usage:
-    # Viotech only
-    python evaluate_moe_zone.py \
-        --checkpoint_path /path/to/checkpoint.pth \
-        --hdf5s_dir /path/to/hdf5s/viotech \
-        --device 0
-
-    # Viotech + RWC
-    python evaluate_moe_zone.py \
-        --checkpoint_path /path/to/checkpoint.pth \
-        --hdf5s_dir /path/to/hdf5s/viotech \
-        --rwc_h5_path ~/data/rwc_processed_data.h5 \
-        --device 0
+Supports:
+  1. Viotech  (--hdf5s_dir)  — default
+  2. RWC      (--rwc_h5_path) — optional
 """
 
 import os
@@ -53,19 +42,24 @@ RWC_LABEL_MAP_DESC = {
 
 
 def _run_eval_loop(model, test_loader, device, dataset_label='dataset'):
-    """Shared evaluation loop for both viotech and RWC.
+    """Shared evaluation loop.
 
-    Uses zone_ prefixed output keys for the Zone-Specialized MoE.
+    Per-Task MoE produces 3 separate gate tensors:
+      pt_gate_tonal, pt_gate_artic, pt_gate_legato
+    We track gate usage separately for each.
     """
     all_tonal_pred, all_tonal_gt = [], []
     all_artic_pred, all_artic_gt = [], []
     all_legato_pred, all_legato_gt = [], []
     total_notes = 0
 
-    gate_usage_sum = None
-    gate_by_tonal = {}
-    gate_by_artic = {}
-    gate_by_legato = {}
+    # Per-task gate accumulation
+    gate_global = {'tonal': None, 'artic': None, 'legato': None}
+    gate_by_class = {
+        'tonal': {},   # cls_id -> (sum_arr, count)
+        'artic': {},
+        'legato': {},
+    }
 
     with torch.no_grad():
         for batch_idx, batch_data_dict in enumerate(test_loader):
@@ -93,20 +87,22 @@ def _run_eval_loop(model, test_loader, device, dataset_label='dataset'):
 
             output_dict = model(batch_data_dict['waveform'], note_info=note_info)
 
-            if 'zone_tonal_logits' not in output_dict:
+            if 'pt_tonal_logits' not in output_dict:
                 continue
 
             B = num_notes.shape[0]
 
-            tonal_pred = output_dict['zone_tonal_logits'].argmax(dim=-1)
-            artic_pred = output_dict['zone_artic_logits'].argmax(dim=-1)
-            legato_pred = (output_dict['zone_legato_prob'].squeeze(-1) > 0.5).long()
+            tonal_pred = output_dict['pt_tonal_logits'].argmax(dim=-1)
+            artic_pred = output_dict['pt_artic_logits'].argmax(dim=-1)
+            legato_pred = (output_dict['pt_legato_prob'].squeeze(-1) > 0.5).long()
 
             tonal_gt = batch_data_dict['note_tonal_technique']
             artic_gt = batch_data_dict['note_articulation']
             legato_gt = batch_data_dict['note_legato']
 
-            gate_probs = output_dict.get('zone_gate_probs')
+            gp_tonal  = output_dict.get('pt_gate_tonal')
+            gp_artic  = output_dict.get('pt_gate_artic')
+            gp_legato = output_dict.get('pt_gate_legato')
 
             for b in range(B):
                 n = num_notes[b].item()
@@ -124,25 +120,9 @@ def _run_eval_loop(model, test_loader, device, dataset_label='dataset'):
                 all_legato_gt.extend(l_gt)
                 total_notes += n
 
-                if gate_probs is not None:
-                    g = gate_probs[b, :n].cpu().numpy()
-                    if gate_usage_sum is None:
-                        gate_usage_sum = g.sum(axis=0)
-                    else:
-                        gate_usage_sum += g.sum(axis=0)
-
-                    for cls_id in np.unique(t_gt):
-                        mask = t_gt == cls_id
-                        s, c = gate_by_tonal.get(int(cls_id), (np.zeros(g.shape[1]), 0))
-                        gate_by_tonal[int(cls_id)] = (s + g[mask].sum(axis=0), c + int(mask.sum()))
-                    for cls_id in np.unique(a_gt):
-                        mask = a_gt == cls_id
-                        s, c = gate_by_artic.get(int(cls_id), (np.zeros(g.shape[1]), 0))
-                        gate_by_artic[int(cls_id)] = (s + g[mask].sum(axis=0), c + int(mask.sum()))
-                    for cls_id in np.unique(l_gt):
-                        mask = l_gt == cls_id
-                        s, c = gate_by_legato.get(int(cls_id), (np.zeros(g.shape[1]), 0))
-                        gate_by_legato[int(cls_id)] = (s + g[mask].sum(axis=0), c + int(mask.sum()))
+                _accum_gate('tonal', gp_tonal, b, n, t_gt, gate_global, gate_by_class)
+                _accum_gate('artic', gp_artic, b, n, a_gt, gate_global, gate_by_class)
+                _accum_gate('legato', gp_legato, b, n, l_gt, gate_global, gate_by_class)
 
             if (batch_idx + 1) % 20 == 0:
                 print(f'  [{dataset_label}] batch {batch_idx + 1}: {total_notes} notes accumulated')
@@ -150,12 +130,26 @@ def _run_eval_loop(model, test_loader, device, dataset_label='dataset'):
     return (np.array(all_tonal_gt, dtype=int), np.array(all_tonal_pred, dtype=int),
             np.array(all_artic_gt, dtype=int), np.array(all_artic_pred, dtype=int),
             np.array(all_legato_gt, dtype=int), np.array(all_legato_pred, dtype=int),
-            gate_usage_sum, gate_by_tonal, gate_by_artic, gate_by_legato, total_notes)
+            gate_global, gate_by_class, total_notes)
+
+
+def _accum_gate(task_name, gate_tensor, b, n, gt_arr, gate_global, gate_by_class):
+    if gate_tensor is None:
+        return
+    g = gate_tensor[b, :n].cpu().numpy()
+    if gate_global[task_name] is None:
+        gate_global[task_name] = g.sum(axis=0)
+    else:
+        gate_global[task_name] += g.sum(axis=0)
+
+    for cls_id in np.unique(gt_arr):
+        mask = gt_arr == cls_id
+        s, c = gate_by_class[task_name].get(int(cls_id), (np.zeros(g.shape[1]), 0))
+        gate_by_class[task_name][int(cls_id)] = (s + g[mask].sum(axis=0), c + int(mask.sum()))
 
 
 def _print_results(banner, tonal_gt, tonal_pred, artic_gt, artic_pred,
-                   legato_gt, legato_pred, gate_usage_sum,
-                   gate_by_tonal, gate_by_artic, gate_by_legato, total_notes):
+                   legato_gt, legato_pred, gate_global, gate_by_class, total_notes):
     print()
     print('=' * 70)
     print(f'  {banner} — Total notes evaluated: {total_notes}')
@@ -166,21 +160,55 @@ def _print_results(banner, tonal_gt, tonal_pred, artic_gt, artic_pred,
     _print_multiclass_report('Articulation', artic_gt, artic_pred, ARTIC_NAMES)
     _print_multiclass_report('Legato', legato_gt, legato_pred, LEGATO_NAMES)
 
-    if gate_usage_sum is not None:
-        num_experts = len(gate_usage_sum)
-        gate_pct = gate_usage_sum / gate_usage_sum.sum() * 100
-        print('-' * 70)
-        print('  Zone MoE Gate Usage — Global (avg routing weight per expert)')
-        print('-' * 70)
-        for i, pct in enumerate(gate_pct):
-            role = EXPERT_ROLES.get(i, f'Expert {i}')
-            bar = '\u2588' * int(pct / 2)
-            print(f'  Expert {i} ({role:8s}): {pct:5.1f}%  {bar}')
-        print()
+    _print_pertask_gate('Tonal', gate_global.get('tonal'), gate_by_class.get('tonal', {}), TONAL_NAMES)
+    _print_pertask_gate('Articulation', gate_global.get('artic'), gate_by_class.get('artic', {}), ARTIC_NAMES)
+    _print_pertask_gate('Legato', gate_global.get('legato'), gate_by_class.get('legato', {}), LEGATO_NAMES)
 
-        _print_gate_by_class('Tonal Technique', gate_by_tonal, TONAL_NAMES, num_experts)
-        _print_gate_by_class('Articulation', gate_by_artic, ARTIC_NAMES, num_experts)
-        _print_gate_by_class('Legato', gate_by_legato, LEGATO_NAMES, num_experts)
+
+def _print_pertask_gate(task_title, global_sum, by_class, class_names):
+    if global_sum is None:
+        return
+    num_experts = len(global_sum)
+    pct = global_sum / global_sum.sum() * 100
+
+    print('-' * 70)
+    print(f'  Per-Task Gate — {task_title} (global avg routing weight)')
+    print('-' * 70)
+    for i, p in enumerate(pct):
+        role = EXPERT_ROLES.get(i, f'Expert {i}')
+        bar = '\u2588' * int(p / 2)
+        print(f'  Expert {i} ({role:8s}): {p:5.1f}%  {bar}')
+    print()
+
+    if not by_class:
+        return
+
+    expert_hdr = ''.join(f'  E{i}({EXPERT_ROLES.get(i,"?"):>5s})' for i in range(num_experts))
+    print(f'  {"Class":15s}  {"Notes":>6s}{expert_hdr}')
+    for cls_id in sorted(by_class.keys()):
+        s, c = by_class[cls_id]
+        name = class_names.get(cls_id, f'class_{cls_id}')
+        if c == 0:
+            continue
+        avg = s / c
+        pcts = avg / avg.sum() * 100
+        cells = ''.join(f'  {p:6.1f}%' for p in pcts)
+        print(f'  {name:15s}  {c:6d}{cells}')
+    print()
+
+    for cls_id in sorted(by_class.keys()):
+        s, c = by_class[cls_id]
+        name = class_names.get(cls_id, f'class_{cls_id}')
+        if c == 0:
+            continue
+        avg = s / c
+        pcts = avg / avg.sum() * 100
+        print(f'  {name}:')
+        for i, p in enumerate(pcts):
+            role = EXPERT_ROLES.get(i, '?')
+            bar = '\u2588' * int(p / 2) + '\u2591' * (50 - int(p / 2))
+            print(f'    E{i}({role:8s}): {bar} {p:5.1f}%')
+        print()
 
 
 def evaluate(args):
@@ -197,7 +225,8 @@ def evaluate(args):
         output_features=True,
         predict_technique=False,
         predict_technique_moe=False,
-        predict_technique_moe_zone=True,
+        predict_technique_moe_zone=False,
+        predict_technique_moe_zone_pt=True,
     )
 
     checkpoint = torch.load(args.checkpoint_path, map_location='cpu', weights_only=False)
@@ -245,7 +274,7 @@ def evaluate(args):
 
     results = _run_eval_loop(model, test_loader, device, dataset_label='Viotech')
     if results[-1] > 0:
-        _print_results('Viotech Zone-MoE', *results)
+        _print_results('Viotech Per-Task Gate Zone-MoE', *results)
     else:
         print('No notes found in the viotech test set.')
 
@@ -260,7 +289,7 @@ def evaluate(args):
         from rwc_moe_utils import RWCMoEDataset, RWCMoETestSampler
 
         print(f'\n{"=" * 70}')
-        print(f'  RWC Evaluation (Zone-Specialized MoE)')
+        print(f'  RWC Evaluation (Per-Task Gate Zone MoE)')
         print(f'{"=" * 70}')
         print(f'  H5 path : {rwc_path}')
         print(f'  Split   : {args.rwc_split}')
@@ -299,7 +328,7 @@ def evaluate(args):
 
         rwc_results = _run_eval_loop(model, rwc_loader, device, dataset_label='RWC')
         if rwc_results[-1] > 0:
-            _print_results('RWC Zone-MoE (cross-dataset)', *rwc_results)
+            _print_results('RWC Per-Task Gate Zone-MoE (cross-dataset)', *rwc_results)
         else:
             print('[RWC] No notes found. Check H5 structure.')
 
@@ -359,47 +388,9 @@ def _print_multiclass_report(title, gt, pred, class_names):
     print()
 
 
-def _print_gate_by_class(title, gate_by_cls, class_names, num_experts):
-    if not gate_by_cls:
-        return
-
-    print('-' * 70)
-    print(f'  Zone MoE Gate Usage — Per {title} Class')
-    print('-' * 70)
-
-    expert_hdr = ''.join(f'  E{i}({EXPERT_ROLES.get(i,"?"):>5s})' for i in range(num_experts))
-    print(f'  {"Class":15s}  {"Notes":>6s}{expert_hdr}')
-
-    for cls_id in sorted(gate_by_cls.keys()):
-        s, c = gate_by_cls[cls_id]
-        name = class_names.get(cls_id, f'class_{cls_id}')
-        if c == 0:
-            continue
-        avg = s / c
-        pcts = avg / avg.sum() * 100
-        cells = ''.join(f'  {p:6.1f}%' for p in pcts)
-        print(f'  {name:15s}  {c:6d}{cells}')
-
-    print()
-
-    for cls_id in sorted(gate_by_cls.keys()):
-        s, c = gate_by_cls[cls_id]
-        name = class_names.get(cls_id, f'class_{cls_id}')
-        if c == 0:
-            continue
-        avg = s / c
-        pcts = avg / avg.sum() * 100
-        print(f'  {name}:')
-        for i, pct in enumerate(pcts):
-            role = EXPERT_ROLES.get(i, '?')
-            bar = '\u2588' * int(pct / 2) + '\u2591' * (50 - int(pct / 2))
-            print(f'    E{i}({role:8s}): {bar} {pct:5.1f}%')
-        print()
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='Evaluate Zone-Specialized MoE technique (+ optional RWC)')
+        description='Evaluate Per-Task Gate Zone MoE technique (+ optional RWC)')
     parser.add_argument('--checkpoint_path', type=str, required=True,
                         help='Path to trained model checkpoint (.pth)')
     parser.add_argument('--hdf5s_dir', type=str, required=True,

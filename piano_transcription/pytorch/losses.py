@@ -193,6 +193,26 @@ def zone_moe_technique_losses(output_dict, target_dict, device=None):
     return zone_moe_note_technique_losses(output_dict, target_dict, device=device)
 
 
+def pertask_zone_moe_technique_losses(output_dict, target_dict, device=None):
+    """Note-level Per-Task Gate Zone MoE technique losses.
+
+    Delegates to moe_zone_pertask.pertask_zone_moe_losses.
+    Returns (loss_tonal, loss_artic, loss_legato, loss_balance).
+    """
+    from moe_zone_pertask import pertask_zone_moe_losses
+    return pertask_zone_moe_losses(output_dict, target_dict, device=device)
+
+
+def frame_multiscale_moe_losses(output_dict, target_dict, device=None):
+    """Frame-level multi-scale MoE technique losses.
+
+    Delegates to moe_frame_multiscale.frame_moe_technique_losses.
+    Returns (loss_tonal, loss_artic, loss_legato, loss_balance).
+    """
+    from moe_frame_multiscale import frame_moe_technique_losses
+    return frame_moe_technique_losses(output_dict, target_dict, device=device)
+
+
 def technique_aux_frame_ce_loss(aux_technique_model, output_dict, target_dict, device=None):
     """Auxiliary frame-level technique classification loss.
 
