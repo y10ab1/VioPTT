@@ -181,7 +181,7 @@ class PerTaskZoneMoEHead(nn.Module):
 # ---------------------------------------------------------------------------
 # Losses
 # ---------------------------------------------------------------------------
-def pertask_zone_moe_losses(output_dict, target_dict, device=None):
+def pertask_zone_moe_losses(output_dict, target_dict, device=None, focal_gamma=0.0):
     """Note-level losses for Per-Task Gate Zone MoE.
 
     Output keys: pt_tonal_logits, pt_artic_logits, pt_legato_prob,
@@ -204,6 +204,9 @@ def pertask_zone_moe_losses(output_dict, target_dict, device=None):
         flat_targets = targets[note_mask]
         if flat_logits.shape[0] == 0:
             return torch.tensor(0.0, device=dev)
+        if focal_gamma > 0:
+            from losses import focal_cross_entropy
+            return focal_cross_entropy(flat_logits, flat_targets, gamma=focal_gamma)
         return F.cross_entropy(flat_logits, flat_targets)
 
     loss_tonal = _masked_ce('pt_tonal_logits', 'note_tonal_technique')

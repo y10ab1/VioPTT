@@ -4,6 +4,30 @@ import torch.nn as nn
 from pytorch_metric_learning import losses, reducers, miners
 from einops import rearrange
 
+
+def focal_cross_entropy(logits, targets, gamma=2.0, weight=None, reduction='mean'):
+    """Focal loss for multi-class classification (Lin et al., 2017).
+
+    FL(p_t) = -(1 - p_t)^gamma * log(p_t)
+
+    Args:
+        logits:  (N, C) raw logits
+        targets: (N,)   int class indices
+        gamma:   focusing parameter (0 = standard CE)
+        weight:  optional (C,) per-class weight tensor
+        reduction: 'mean' or 'sum'
+    """
+    log_p = F.log_softmax(logits, dim=-1)                   # (N, C)
+    p = log_p.exp()                                          # (N, C)
+    ce = F.nll_loss(log_p, targets, weight=weight, reduction='none')  # (N,)
+    p_t = p.gather(1, targets.unsqueeze(1)).squeeze(1)       # (N,)
+    focal_weight = (1.0 - p_t) ** gamma
+    loss = focal_weight * ce
+    if reduction == 'mean':
+        return loss.mean()
+    return loss.sum()
+
+
 def technique_frame_ce_loss(output_dict, target_dict, device=None, use_active_mask=True):
     """Legacy single-head technique loss (kept for backward compatibility)."""
     if ('technique_output' not in output_dict) or ('technique' not in target_dict):
@@ -173,44 +197,48 @@ def viotech_technique_losses(output_dict, target_dict, device=None, use_active_m
     loss_leg = legato_loss(output_dict, target_dict, device, use_active_mask)
     return loss_tonal, loss_artic, loss_leg
 
-def moe_technique_losses(output_dict, target_dict, device=None):
+def moe_technique_losses(output_dict, target_dict, device=None, focal_gamma=0.0):
     """Note-level MoE technique losses (tonal + artic + legato + balance).
 
     Delegates to moe_technique.moe_note_technique_losses.
     Returns (loss_tonal, loss_artic, loss_legato, loss_balance).
     """
     from moe_technique import moe_note_technique_losses
-    return moe_note_technique_losses(output_dict, target_dict, device=device)
+    return moe_note_technique_losses(output_dict, target_dict, device=device,
+                                     focal_gamma=focal_gamma)
 
 
-def zone_moe_technique_losses(output_dict, target_dict, device=None):
+def zone_moe_technique_losses(output_dict, target_dict, device=None, focal_gamma=0.0):
     """Note-level Zone-Specialized MoE technique losses.
 
     Delegates to moe_zone_specialist.zone_moe_note_technique_losses.
     Returns (loss_tonal, loss_artic, loss_legato, loss_balance).
     """
     from moe_zone_specialist import zone_moe_note_technique_losses
-    return zone_moe_note_technique_losses(output_dict, target_dict, device=device)
+    return zone_moe_note_technique_losses(output_dict, target_dict, device=device,
+                                          focal_gamma=focal_gamma)
 
 
-def pertask_zone_moe_technique_losses(output_dict, target_dict, device=None):
+def pertask_zone_moe_technique_losses(output_dict, target_dict, device=None, focal_gamma=0.0):
     """Note-level Per-Task Gate Zone MoE technique losses.
 
     Delegates to moe_zone_pertask.pertask_zone_moe_losses.
     Returns (loss_tonal, loss_artic, loss_legato, loss_balance).
     """
     from moe_zone_pertask import pertask_zone_moe_losses
-    return pertask_zone_moe_losses(output_dict, target_dict, device=device)
+    return pertask_zone_moe_losses(output_dict, target_dict, device=device,
+                                   focal_gamma=focal_gamma)
 
 
-def frame_multiscale_moe_losses(output_dict, target_dict, device=None):
+def frame_multiscale_moe_losses(output_dict, target_dict, device=None, focal_gamma=0.0):
     """Frame-level multi-scale MoE technique losses.
 
     Delegates to moe_frame_multiscale.frame_moe_technique_losses.
     Returns (loss_tonal, loss_artic, loss_legato, loss_balance).
     """
     from moe_frame_multiscale import frame_moe_technique_losses
-    return frame_moe_technique_losses(output_dict, target_dict, device=device)
+    return frame_moe_technique_losses(output_dict, target_dict, device=device,
+                                      focal_gamma=focal_gamma)
 
 
 def technique_aux_frame_ce_loss(aux_technique_model, output_dict, target_dict, device=None):

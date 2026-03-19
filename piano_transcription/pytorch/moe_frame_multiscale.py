@@ -287,7 +287,7 @@ class FrameMultiScaleMoEHead(nn.Module):
 EXPERT_NAMES = {0: 'Onset', 1: 'Note', 2: 'Phrase', 3: 'Spectral'}
 
 
-def frame_moe_technique_losses(output_dict, target_dict, device=None):
+def frame_moe_technique_losses(output_dict, target_dict, device=None, focal_gamma=0.0):
     """Frame-level technique losses for the multi-scale MoE.
 
     Output keys: fmoe_tonal_logits, fmoe_artic_logits, fmoe_legato_prob,
@@ -319,6 +319,9 @@ def frame_moe_technique_losses(output_dict, target_dict, device=None):
                 targets_1d = targets_1d[m]
             else:
                 return torch.tensor(0.0, device=dev)
+        if focal_gamma > 0:
+            from losses import focal_cross_entropy
+            return focal_cross_entropy(logits_2d, targets_1d, gamma=focal_gamma)
         return F.cross_entropy(logits_2d, targets_1d)
 
     loss_tonal = _frame_ce('fmoe_tonal_logits', 'tonal_technique')

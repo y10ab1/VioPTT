@@ -162,7 +162,7 @@ class MoETechniqueHead(nn.Module):
 # ---------------------------------------------------------------------------
 # Losses
 # ---------------------------------------------------------------------------
-def moe_note_technique_losses(output_dict, target_dict, device=None):
+def moe_note_technique_losses(output_dict, target_dict, device=None, focal_gamma=0.0):
     """Compute note-level technique losses for the MoE head.
 
     Args:
@@ -176,6 +176,7 @@ def moe_note_technique_losses(output_dict, target_dict, device=None):
             note_articulation     (B, N)  int
             note_legato           (B, N)  int {0,1}
             num_notes             (B,)    int
+        focal_gamma: focal loss gamma (0 = standard CE)
 
     Returns:
         (loss_tonal, loss_artic, loss_legato, loss_balance)  — each scalar
@@ -196,6 +197,9 @@ def moe_note_technique_losses(output_dict, target_dict, device=None):
         flat_targets = targets[note_mask]          # (K,)
         if flat_logits.shape[0] == 0:
             return torch.tensor(0.0, device=dev)
+        if focal_gamma > 0:
+            from losses import focal_cross_entropy
+            return focal_cross_entropy(flat_logits, flat_targets, gamma=focal_gamma)
         return F.cross_entropy(flat_logits, flat_targets)
 
     loss_tonal = _masked_ce('note_tonal_logits', 'note_tonal_technique')

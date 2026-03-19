@@ -94,11 +94,14 @@ def train(args):
     moe_zone_pt_balance_coeff = getattr(args, 'moe_zone_pt_balance_coeff', 0.001)
     technique_frame_moe_weight = getattr(args, 'technique_frame_moe_weight', 0.0)
     frame_moe_balance_coeff = getattr(args, 'frame_moe_balance_coeff', 0.001)
+    focal_gamma = getattr(args, 'focal_gamma', 0.0)
     print('technique weight: ', technique_weight)
     print('technique MoE weight: ', technique_moe_weight)
     print('technique MoE-Zone weight: ', technique_moe_zone_weight)
     print('technique MoE-Zone-PerTask weight: ', technique_moe_zone_pt_weight)
     print('technique Frame-MoE weight: ', technique_frame_moe_weight)
+    if focal_gamma > 0:
+        print('focal loss gamma: ', focal_gamma)
 
     sample_rate = config.sample_rate
     segment_seconds = config.segment_seconds
@@ -835,7 +838,7 @@ def train(args):
         moe_tonal = moe_artic = moe_legato = None
         if technique_moe_weight > 0 and 'note_tonal_logits' in batch_output_dict:
             moe_tonal, moe_artic, moe_legato, loss_moe_balance = \
-                moe_technique_losses(batch_output_dict, batch_data_dict, device=device)
+                moe_technique_losses(batch_output_dict, batch_data_dict, device=device, focal_gamma=focal_gamma)
             loss_moe_technique = moe_tonal + moe_artic + moe_legato
 
         # Zone-Specialized MoE technique losses
@@ -844,7 +847,7 @@ def train(args):
         zone_tonal = zone_artic = zone_legato = None
         if technique_moe_zone_weight > 0 and 'zone_tonal_logits' in batch_output_dict:
             zone_tonal, zone_artic, zone_legato, loss_zone_moe_balance = \
-                zone_moe_technique_losses(batch_output_dict, batch_data_dict, device=device)
+                zone_moe_technique_losses(batch_output_dict, batch_data_dict, device=device, focal_gamma=focal_gamma)
             loss_zone_moe_technique = zone_tonal + zone_artic + zone_legato
 
         # Per-Task Gate Zone MoE technique losses
@@ -853,7 +856,7 @@ def train(args):
         pt_tonal = pt_artic = pt_legato = None
         if technique_moe_zone_pt_weight > 0 and 'pt_tonal_logits' in batch_output_dict:
             pt_tonal, pt_artic, pt_legato, loss_pt_moe_balance = \
-                pertask_zone_moe_technique_losses(batch_output_dict, batch_data_dict, device=device)
+                pertask_zone_moe_technique_losses(batch_output_dict, batch_data_dict, device=device, focal_gamma=focal_gamma)
             loss_pt_moe_technique = pt_tonal + pt_artic + pt_legato
 
         # Frame-level Multi-Scale MoE technique losses
@@ -862,7 +865,7 @@ def train(args):
         fmoe_tonal = fmoe_artic = fmoe_legato = None
         if technique_frame_moe_weight > 0 and 'fmoe_tonal_logits' in batch_output_dict:
             fmoe_tonal, fmoe_artic, fmoe_legato, loss_frame_moe_balance = \
-                frame_multiscale_moe_losses(batch_output_dict, batch_data_dict, device=device)
+                frame_multiscale_moe_losses(batch_output_dict, batch_data_dict, device=device, focal_gamma=focal_gamma)
             loss_frame_moe_technique = fmoe_tonal + fmoe_artic + fmoe_legato
 
         if contrast_weight > 0:
@@ -1048,6 +1051,8 @@ if __name__ == '__main__':
         help='Weight for Frame-level Multi-Scale MoE technique loss (0 = disabled)')
     parser_train.add_argument('--frame_moe_balance_coeff', type=float, default=0.001,
         help='Coefficient for Frame MoE load-balance auxiliary loss')
+    parser_train.add_argument('--focal_gamma', type=float, default=0.0,
+        help='Focal loss gamma for technique CE losses (0 = standard CE, 2.0 recommended)')
     args = parser.parse_args()
     args.filename = get_filename(__file__)
 

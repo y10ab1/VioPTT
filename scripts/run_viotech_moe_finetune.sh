@@ -42,4 +42,5 @@ python3 pytorch/main_contrast.py train \
     --num_workers=8 \
     --technique_weight=0.0 \
     --technique_moe_weight=0.1 \
-    --moe_balance_coeff=0.01
+    --moe_balance_coeff=0.01 \
+    

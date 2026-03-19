@@ -205,7 +205,7 @@ class ZoneMoETechniqueHead(nn.Module):
 # ---------------------------------------------------------------------------
 # Losses  (same structure as vanilla MoE, reading from zone_ prefixed keys)
 # ---------------------------------------------------------------------------
-def zone_moe_note_technique_losses(output_dict, target_dict, device=None):
+def zone_moe_note_technique_losses(output_dict, target_dict, device=None, focal_gamma=0.0):
     """Compute note-level technique losses for the Zone-Specialized MoE head.
 
     Keys expected:
@@ -230,6 +230,9 @@ def zone_moe_note_technique_losses(output_dict, target_dict, device=None):
         flat_targets = targets[note_mask]
         if flat_logits.shape[0] == 0:
             return torch.tensor(0.0, device=dev)
+        if focal_gamma > 0:
+            from losses import focal_cross_entropy
+            return focal_cross_entropy(flat_logits, flat_targets, gamma=focal_gamma)
         return F.cross_entropy(flat_logits, flat_targets)
 
     loss_tonal = _masked_ce('zone_tonal_logits', 'note_tonal_technique')
