@@ -10,11 +10,16 @@ Expert 0 — Onset specialist (short-range ~110ms):
 
 Expert 1 — Note specialist (medium-range ~510ms):
     Medium 1D conv + frame-activity injection.
-    Captures sustained note characteristics (vibrato, harmonics, sustain).
+    Captures sustained note characteristics (vibrato, sustain).
 
 Expert 2 — Phrase specialist (long-range ~1.5s):
     Large 1D conv (dilated for efficiency) + all cues.
     Captures legato transitions, phrase-level structure.
+
+Expert 3 — Spectral specialist (frequency domain):
+    2D CNN on logmel spectrogram + frame-activity cue.
+    Captures harmonic energy distribution, spectral envelope differences
+    (e.g. harmonics vs normal have different overtone patterns at same pitch).
 
 Three independent per-task gates (tonal / articulation / legato), so each
 task can learn its own routing pattern.
@@ -30,7 +35,7 @@ from dataclasses import dataclass
 class FrameMultiScaleMoEConfig:
     feat_dim: int = 512
     proj_dim: int = 128
-    num_experts: int = 3
+    num_experts: int = 4
     short_kernel: int = 11      # ~110ms at 100fps
     note_kernel: int = 51       # ~510ms
     phrase_kernel: int = 51     # dilated×3 → effective ~1.5s
@@ -40,6 +45,9 @@ class FrameMultiScaleMoEConfig:
     num_tonal_classes: int = 4
     num_artic_classes: int = 4
     cue_dim: int = 16           # projected dim for each transcription cue
+    mel_bins: int = 229         # logmel frequency bins
+    spectral_channels: int = 32 # 2D CNN intermediate channels
+    spectral_proj_dim: int = 128  # spectral expert projected dim (→ P)
     gate_dropout: float = 0.0
     expert_dropout: float = 0.2
     balance_loss_coeff: float = 0.001
@@ -65,6 +73,39 @@ class _TemporalCtx(nn.Module):
         # x: (B, T, D)
         h = self.dw(x.transpose(1, 2))  # (B, D, T)
         h = self.pw(h).transpose(1, 2)  # (B, T, out_dim)
+        return F.gelu(self.norm(h))
+
+
+class _SpectralCtx(nn.Module):
+    """2D CNN on logmel spectrogram for frequency-domain feature extraction.
+
+    Input : logmel (B, 1, T, mel_bins)  — raw log-mel spectrogram
+    Output: (B, T, out_dim)             — per-frame spectral descriptor
+
+    Architecture: two small 2D conv layers that preserve the time axis,
+    then adaptive average-pool across frequency → per-frame vector.
+    """
+
+    def __init__(self, mel_bins: int, channels: int, out_dim: int):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(1, channels, kernel_size=(3, 7), padding=(1, 3)),
+            nn.BatchNorm2d(channels),
+            nn.GELU(),
+            nn.Conv2d(channels, channels, kernel_size=(3, 7), padding=(1, 3)),
+            nn.BatchNorm2d(channels),
+            nn.GELU(),
+        )
+        self.freq_pool = nn.AdaptiveAvgPool2d((None, 1))  # pool freq → 1
+        self.proj = nn.Linear(channels, out_dim)
+        self.norm = nn.LayerNorm(out_dim)
+
+    def forward(self, logmel):
+        # logmel: (B, 1, T, mel_bins)
+        h = self.conv(logmel)          # (B, C, T, mel_bins)
+        h = self.freq_pool(h)          # (B, C, T, 1)
+        h = h.squeeze(-1).transpose(1, 2)  # (B, T, C)
+        h = self.proj(h)              # (B, T, out_dim)
         return F.gelu(self.norm(h))
 
 
@@ -117,6 +158,7 @@ class FrameMultiScaleMoEHead(nn.Module):
         D = cfg.feat_dim
         P = cfg.proj_dim
         C = cfg.cue_dim
+        SP = cfg.spectral_proj_dim
 
         # Transcription cue projections (scalar → small embedding)
         self.onset_proj = nn.Linear(1, C)
@@ -129,19 +171,25 @@ class FrameMultiScaleMoEHead(nn.Module):
         self.phrase_ctx = _TemporalCtx(D, P, cfg.phrase_kernel,
                                        dilation=cfg.phrase_dilation)
 
+        # Spectral context extractor (2D CNN on logmel)
+        self.spectral_ctx = _SpectralCtx(
+            cfg.mel_bins, cfg.spectral_channels, SP)
+
         # Expert input dims
         exp0_in = P + C           # short_ctx + onset_cue
         exp1_in = P + C           # note_ctx  + frame_cue
         exp2_in = P + 3 * C       # phrase_ctx + all three cues
+        exp3_in = SP + C          # spectral_ctx + frame_cue
 
         self.experts = nn.ModuleList([
             _Expert(exp0_in, cfg.expert_hidden, cfg.shared_dim, cfg.expert_dropout),
             _Expert(exp1_in, cfg.expert_hidden, cfg.shared_dim, cfg.expert_dropout),
             _Expert(exp2_in, cfg.expert_hidden, cfg.shared_dim, cfg.expert_dropout),
+            _Expert(exp3_in, cfg.expert_hidden, cfg.shared_dim, cfg.expert_dropout),
         ])
 
-        # Gate input: all 3 contexts + all 3 cues
-        gate_in = 3 * P + 3 * C
+        # Gate input: all 3 temporal contexts + spectral ctx + all 3 cues
+        gate_in = 3 * P + SP + 3 * C
         gate_hidden = cfg.expert_hidden // 2
 
         self.gate_tonal = _Gate(gate_in, cfg.num_experts, gate_hidden, cfg.gate_dropout)
@@ -162,36 +210,53 @@ class FrameMultiScaleMoEHead(nn.Module):
             return self._top_k_gating(logits, self.cfg.top_k)
         return F.softmax(logits, dim=-1)
 
-    def forward(self, features, onset_prob, offset_prob, frame_prob):
+    def forward(self, features, onset_prob, offset_prob, frame_prob,
+                logmel=None):
         """
         Args:
-            features:    (B, T, D) acoustic features
+            features:    (B, T, D) acoustic features from dedicated CRNN
             onset_prob:  (B, T, 1) max-pooled onset probability
             offset_prob: (B, T, 1) max-pooled offset probability
             frame_prob:  (B, T, 1) max-pooled frame activity probability
+            logmel:      (B, 1, T, mel_bins) raw log-mel spectrogram for spectral expert
         """
         # Project transcription cues
         c_onset = F.gelu(self.onset_proj(onset_prob))    # (B, T, C)
         c_offset = F.gelu(self.offset_proj(offset_prob))
         c_frame = F.gelu(self.frame_proj(frame_prob))
 
-        # Multi-scale contexts
+        # Multi-scale temporal contexts
         s_short = self.short_ctx(features)   # (B, T, P)
         s_note = self.note_ctx(features)     # (B, T, P)
         s_phrase = self.phrase_ctx(features)  # (B, T, P)
+
+        # Spectral context from raw logmel
+        if logmel is not None:
+            s_spec = self.spectral_ctx(logmel)  # (B, T', SP)
+            T_feat = s_short.shape[1]
+            T_spec = s_spec.shape[1]
+            if T_spec != T_feat:
+                s_spec = s_spec[:, :T_feat, :] if T_spec > T_feat else \
+                    F.pad(s_spec, (0, 0, 0, T_feat - T_spec))
+        else:
+            B, T_feat, _ = s_short.shape
+            s_spec = torch.zeros(B, T_feat, self.cfg.spectral_proj_dim,
+                                 device=features.device)
 
         # Expert-specific inputs
         inp_0 = torch.cat([s_short, c_onset], dim=-1)
         inp_1 = torch.cat([s_note, c_frame], dim=-1)
         inp_2 = torch.cat([s_phrase, c_onset, c_offset, c_frame], dim=-1)
+        inp_3 = torch.cat([s_spec, c_frame], dim=-1)
 
         e0 = self.experts[0](inp_0)
         e1 = self.experts[1](inp_1)
         e2 = self.experts[2](inp_2)
-        expert_outs = torch.stack([e0, e1, e2], dim=-2)  # (B, T, 3, shared_dim)
+        e3 = self.experts[3](inp_3)
+        expert_outs = torch.stack([e0, e1, e2, e3], dim=-2)  # (B, T, 4, shared_dim)
 
-        # Gate input: full view
-        gate_in = torch.cat([s_short, s_note, s_phrase,
+        # Gate input: all contexts + all cues
+        gate_in = torch.cat([s_short, s_note, s_phrase, s_spec,
                              c_onset, c_offset, c_frame], dim=-1)
 
         gp_tonal = self._get_gate_probs(self.gate_tonal, gate_in)
@@ -219,7 +284,7 @@ class FrameMultiScaleMoEHead(nn.Module):
 # ---------------------------------------------------------------------------
 # Losses — frame-level with active-mask
 # ---------------------------------------------------------------------------
-EXPERT_NAMES = {0: 'Onset', 1: 'Note', 2: 'Phrase'}
+EXPERT_NAMES = {0: 'Onset', 1: 'Note', 2: 'Phrase', 3: 'Spectral'}
 
 
 def frame_moe_technique_losses(output_dict, target_dict, device=None):

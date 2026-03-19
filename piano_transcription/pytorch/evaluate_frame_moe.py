@@ -32,7 +32,7 @@ import config
 TONAL_NAMES = {0: 'none', 1: 'pizzicato', 2: 'harmonics', 3: 'openstring'}
 ARTIC_NAMES = {0: 'none', 1: 'release', 2: 'staccato', 3: 'spiccato'}
 LEGATO_NAMES = {0: 'bow_change', 1: 'sustained'}
-EXPERT_NAMES = {0: 'Onset', 1: 'Note', 2: 'Phrase'}
+EXPERT_NAMES = {0: 'Onset', 1: 'Note', 2: 'Phrase', 3: 'Spectral'}
 
 
 def _run_eval_loop(model, test_loader, device, dataset_label='dataset'):

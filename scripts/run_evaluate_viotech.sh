@@ -21,7 +21,7 @@ CHECKPOINT_PATH="${WORKSPACE}/checkpoints/main_contrast/${MODEL_TAG}/Regress_ons
 HDF5S_DIR="${WORKSPACE}/hdf5s/viotech"
 
 # Evaluation split
-SPLIT="test"
+SPLIT="validation"
 
 # RWC H5 path (set to empty string or non-existent path to skip)
 RWC_H5="/mnt/hdd/rwc_processed_data.h5"

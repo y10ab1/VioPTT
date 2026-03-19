@@ -20,7 +20,7 @@ fi
 
 TB="${WORKSPACE}/tb"
 PRETRAIN_PATH="${WORKSPACE}/checkpoints/transcriptor_model.pth"
-MODEL_TAG="vioptt_viotech_frame_moe_v0.1"
+MODEL_TAG="vioptt_viotech_frame_moe_v0.1_spectral"
 
 cd "${WORKSPACE}/piano_transcription"
 
@@ -38,7 +38,7 @@ python3 pytorch/main_contrast.py train \
     --reduce_iteration=1000 \
     --resume_iteration=0 \
     --early_stop=10000 \
-    --device 0 \
+    --device 2 \
     --dataset viotech \
     --contrast_weight=0.0 \
     --ctc_weight=0.0 \

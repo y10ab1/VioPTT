@@ -475,7 +475,8 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
             frame_cue = output_dict['frame_output'].max(dim=-1, keepdim=True)[0]
 
             fm_t, fm_a, fm_l, fg_t, fg_a, fg_l = self.frame_moe_head(
-                fmoe_features, onset_cue, offset_cue, frame_cue)
+                fmoe_features, onset_cue, offset_cue, frame_cue,
+                logmel=logmel)
 
             output_dict['fmoe_tonal_logits'] = fm_t
             output_dict['fmoe_artic_logits'] = fm_a
