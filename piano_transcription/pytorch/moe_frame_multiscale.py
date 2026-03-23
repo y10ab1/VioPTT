@@ -45,9 +45,7 @@ class FrameMultiScaleMoEConfig:
     num_tonal_classes: int = 4
     num_artic_classes: int = 4
     cue_dim: int = 16           # projected dim for each transcription cue
-    mel_bins: int = 229         # logmel frequency bins
-    spectral_channels: int = 32 # 2D CNN intermediate channels
-    spectral_proj_dim: int = 128  # spectral expert projected dim (→ P)
+    spectral_proj_dim: int = 128     # spectral expert projected dim (→ SP)
     gate_dropout: float = 0.0
     expert_dropout: float = 0.2
     balance_loss_coeff: float = 0.001
@@ -76,37 +74,46 @@ class _TemporalCtx(nn.Module):
         return F.gelu(self.norm(h))
 
 
-class _SpectralCtx(nn.Module):
-    """2D CNN on logmel spectrogram for frequency-domain feature extraction.
+class _DedicatedSpectralCNN(nn.Module):
+    """Dedicated 4-layer ConvBlock stack for spectral technique features.
 
-    Input : logmel (B, 1, T, mel_bins)  — raw log-mel spectrogram
-    Output: (B, T, out_dim)             — per-frame spectral descriptor
+    Same proven architecture as NoteLevelTechniqueModel's conv stack, but
+    outputs **per-frame** features instead of a global-pooled summary.
 
-    Architecture: two small 2D conv layers that preserve the time axis,
-    then adaptive average-pool across frequency → per-frame vector.
+    All parameters are trained exclusively by the technique loss — no
+    transcription gradient contaminates these weights.  This gives the
+    spectral expert filters that are specifically tuned for technique-
+    discriminative spectral patterns (overtone distribution, attack shape,
+    spectral envelope).
+
+    Input : logmel (B, 1, T, 229)  — BN-normalised log-mel spectrogram
+    Output: (B, T, out_dim)        — per-frame spectral descriptor
     """
 
-    def __init__(self, mel_bins: int, channels: int, out_dim: int):
+    def __init__(self, out_dim: int = 128, momentum: float = 0.01):
         super().__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(1, channels, kernel_size=(3, 7), padding=(1, 3)),
-            nn.BatchNorm2d(channels),
-            nn.GELU(),
-            nn.Conv2d(channels, channels, kernel_size=(3, 7), padding=(1, 3)),
-            nn.BatchNorm2d(channels),
-            nn.GELU(),
-        )
-        self.freq_pool = nn.AdaptiveAvgPool2d((None, 1))  # pool freq → 1
-        self.proj = nn.Linear(channels, out_dim)
+        from models_contrast import ConvBlock
+        self.conv_block1 = ConvBlock(in_channels=1, out_channels=48, momentum=momentum)
+        self.conv_block2 = ConvBlock(in_channels=48, out_channels=64, momentum=momentum)
+        self.conv_block3 = ConvBlock(in_channels=64, out_channels=96, momentum=momentum)
+        self.conv_block4 = ConvBlock(in_channels=96, out_channels=128, momentum=momentum)
+        # 128 channels × 14 freq bins (229 / 2^4) = 1792
+        self.proj = nn.Linear(1792, out_dim, bias=False)
         self.norm = nn.LayerNorm(out_dim)
 
     def forward(self, logmel):
-        # logmel: (B, 1, T, mel_bins)
-        h = self.conv(logmel)          # (B, C, T, mel_bins)
-        h = self.freq_pool(h)          # (B, C, T, 1)
-        h = h.squeeze(-1).transpose(1, 2)  # (B, T, C)
-        h = self.proj(h)              # (B, T, out_dim)
-        return F.gelu(self.norm(h))
+        # logmel: (B, 1, T, 229)
+        x = self.conv_block1(logmel, pool_size=(1, 2), pool_type='avg')
+        x = F.dropout(x, p=0.2, training=self.training)
+        x = self.conv_block2(x, pool_size=(1, 2), pool_type='avg')
+        x = F.dropout(x, p=0.2, training=self.training)
+        x = self.conv_block3(x, pool_size=(1, 2), pool_type='avg')
+        x = F.dropout(x, p=0.2, training=self.training)
+        x = self.conv_block4(x, pool_size=(1, 2), pool_type='avg')
+        x = F.dropout(x, p=0.2, training=self.training)
+        # (B, 128, T, 14) → per-frame flatten + project
+        x = x.transpose(1, 2).flatten(2)       # (B, T, 1792)
+        return F.gelu(self.norm(self.proj(x)))  # (B, T, out_dim)
 
 
 class _Expert(nn.Module):
@@ -171,15 +178,21 @@ class FrameMultiScaleMoEHead(nn.Module):
         self.phrase_ctx = _TemporalCtx(D, P, cfg.phrase_kernel,
                                        dilation=cfg.phrase_dilation)
 
-        # Spectral context extractor (2D CNN on logmel)
-        self.spectral_ctx = _SpectralCtx(
-            cfg.mel_bins, cfg.spectral_channels, SP)
+        # Dedicated spectral CNN — own ConvBlock stack, technique-only gradients
+        self.spectral_cnn = _DedicatedSpectralCNN(out_dim=SP)
+
+        # Projection for GRU features fed into spectral expert
+        self.feat_proj = nn.Sequential(
+            nn.Linear(D, P, bias=False),
+            nn.LayerNorm(P),
+            nn.GELU(),
+        )
 
         # Expert input dims
         exp0_in = P + C           # short_ctx + onset_cue
         exp1_in = P + C           # note_ctx  + frame_cue
         exp2_in = P + 3 * C       # phrase_ctx + all three cues
-        exp3_in = SP + C          # spectral_ctx + frame_cue
+        exp3_in = SP + P + C      # spectral_cnn + gru_feat_proj + frame_cue
 
         self.experts = nn.ModuleList([
             _Expert(exp0_in, cfg.expert_hidden, cfg.shared_dim, cfg.expert_dropout),
@@ -188,8 +201,8 @@ class FrameMultiScaleMoEHead(nn.Module):
             _Expert(exp3_in, cfg.expert_hidden, cfg.shared_dim, cfg.expert_dropout),
         ])
 
-        # Gate input: all 3 temporal contexts + spectral ctx + all 3 cues
-        gate_in = 3 * P + SP + 3 * C
+        # Gate input: all 3 temporal contexts + spectral ctx + gru proj + all 3 cues
+        gate_in = 3 * P + SP + P + 3 * C
         gate_hidden = cfg.expert_hidden // 2
 
         self.gate_tonal = _Gate(gate_in, cfg.num_experts, gate_hidden, cfg.gate_dropout)
@@ -211,14 +224,15 @@ class FrameMultiScaleMoEHead(nn.Module):
         return F.softmax(logits, dim=-1)
 
     def forward(self, features, onset_prob, offset_prob, frame_prob,
-                logmel=None):
+                logmel=None, conv2d_map=None):
         """
         Args:
-            features:    (B, T, D) acoustic features from dedicated CRNN
+            features:    (B, T, D) acoustic features (GRU output) from dedicated CRNN
             onset_prob:  (B, T, 1) max-pooled onset probability
             offset_prob: (B, T, 1) max-pooled offset probability
             frame_prob:  (B, T, 1) max-pooled frame activity probability
-            logmel:      (B, 1, T, mel_bins) raw log-mel spectrogram for spectral expert
+            logmel:      (B, 1, T, 229) BN-normalised log-mel spectrogram
+            conv2d_map:  (B, C_in, T, F) (unused, kept for backward compat)
         """
         # Project transcription cues
         c_onset = F.gelu(self.onset_proj(onset_prob))    # (B, T, C)
@@ -230,24 +244,27 @@ class FrameMultiScaleMoEHead(nn.Module):
         s_note = self.note_ctx(features)     # (B, T, P)
         s_phrase = self.phrase_ctx(features)  # (B, T, P)
 
-        # Spectral context from raw logmel
+        # Dedicated spectral CNN — directly from logmel
+        T_feat = s_short.shape[1]
         if logmel is not None:
-            s_spec = self.spectral_ctx(logmel)  # (B, T', SP)
-            T_feat = s_short.shape[1]
+            s_spec = self.spectral_cnn(logmel)  # (B, T', SP)
             T_spec = s_spec.shape[1]
             if T_spec != T_feat:
                 s_spec = s_spec[:, :T_feat, :] if T_spec > T_feat else \
                     F.pad(s_spec, (0, 0, 0, T_feat - T_spec))
         else:
-            B, T_feat, _ = s_short.shape
-            s_spec = torch.zeros(B, T_feat, self.cfg.spectral_proj_dim,
+            s_spec = torch.zeros(features.shape[0], T_feat,
+                                 self.cfg.spectral_proj_dim,
                                  device=features.device)
+
+        # Project GRU features for spectral expert
+        f_proj = self.feat_proj(features)     # (B, T, P)
 
         # Expert-specific inputs
         inp_0 = torch.cat([s_short, c_onset], dim=-1)
         inp_1 = torch.cat([s_note, c_frame], dim=-1)
         inp_2 = torch.cat([s_phrase, c_onset, c_offset, c_frame], dim=-1)
-        inp_3 = torch.cat([s_spec, c_frame], dim=-1)
+        inp_3 = torch.cat([s_spec, f_proj, c_frame], dim=-1)
 
         e0 = self.experts[0](inp_0)
         e1 = self.experts[1](inp_1)
@@ -255,8 +272,8 @@ class FrameMultiScaleMoEHead(nn.Module):
         e3 = self.experts[3](inp_3)
         expert_outs = torch.stack([e0, e1, e2, e3], dim=-2)  # (B, T, 4, shared_dim)
 
-        # Gate input: all contexts + all cues
-        gate_in = torch.cat([s_short, s_note, s_phrase, s_spec,
+        # Gate input: all contexts + gru proj + all cues
+        gate_in = torch.cat([s_short, s_note, s_phrase, s_spec, f_proj,
                              c_onset, c_offset, c_frame], dim=-1)
 
         gp_tonal = self._get_gate_probs(self.gate_tonal, gate_in)

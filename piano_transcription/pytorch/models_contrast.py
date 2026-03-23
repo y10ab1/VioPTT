@@ -114,7 +114,8 @@ class ConvBlock(nn.Module):
 
 
 class AcousticModelCRnn8Dropout(nn.Module):
-    def __init__(self, classes_num, midfeat, momentum, output_features=False):
+    def __init__(self, classes_num, midfeat, momentum, output_features=False,
+                 output_conv2d_map=False):
         super(AcousticModelCRnn8Dropout, self).__init__()
 
         self.conv_block1 = ConvBlock(in_channels=1, out_channels=48, momentum=momentum)
@@ -131,10 +132,8 @@ class AcousticModelCRnn8Dropout(nn.Module):
         self.fc = nn.Linear(512, classes_num, bias=True)
         
         self.init_weight()
-        if output_features:
-            self.output_features = True
-        else:
-            self.output_features = False
+        self.output_features = output_features
+        self.output_conv2d_map = output_conv2d_map
 
     def init_weight(self):
         init_layer(self.fc5)
@@ -149,6 +148,8 @@ class AcousticModelCRnn8Dropout(nn.Module):
 
         Outputs:
           output: (batch_size, time_steps, classes_num)
+          If output_features: also returns GRU features (B, T, 512)
+          If output_conv2d_map: also returns conv_block4 2D map (B, 128, T, freq_bins//16)
         """
 
         x = self.conv_block1(input, pool_size=(1, 2), pool_type='avg')
@@ -160,6 +161,8 @@ class AcousticModelCRnn8Dropout(nn.Module):
         x = self.conv_block4(x, pool_size=(1, 2), pool_type='avg')
         x = F.dropout(x, p=0.2, training=self.training)
 
+        conv2d_map = x if self.output_conv2d_map else None  # (B, 128, T, 14)
+
         x = x.transpose(1, 2).flatten(2)
         x = F.relu(self.bn5(self.fc5(x).transpose(1, 2)).transpose(1, 2))
         x = F.dropout(x, p=0.5, training=self.training, inplace=False)
@@ -168,8 +171,12 @@ class AcousticModelCRnn8Dropout(nn.Module):
         x = F.dropout(x, p=0.5, training=self.training, inplace=False)
         output = torch.sigmoid(self.fc(x))
 
-        if self.output_features:
+        if self.output_features and self.output_conv2d_map:
+            return output, x, conv2d_map
+        elif self.output_features:
             return output, x
+        elif self.output_conv2d_map:
+            return output, conv2d_map
         else:
             return output
 
@@ -297,7 +304,8 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
         # Frame-level Multi-Scale MoE technique branch (end-to-end, no GT boundaries)
         if self.predict_technique_frame_moe:
             self.technique_acoustic_frame_moe = AcousticModelCRnn8Dropout(
-                classes_num, midfeat, momentum, output_features=True)
+                classes_num, midfeat, momentum,
+                output_features=True)
             self.frame_moe_head = FrameMultiScaleMoEHead(
                 frame_moe_config or FrameMultiScaleMoEConfig())
 
@@ -468,7 +476,8 @@ class Regress_onset_offset_frame_velocity_CRNN(nn.Module):
 
         # Frame-level Multi-Scale MoE technique branch (end-to-end)
         if self.predict_technique_frame_moe:
-            _, fmoe_features = self.technique_acoustic_frame_moe(logmel)  # (B, T, 512)
+            _, fmoe_features = self.technique_acoustic_frame_moe(logmel)
+            # fmoe_features: (B, T, 512)
             # Transcription structural cues — max-pool across pitches
             onset_cue = output_dict['reg_onset_output'].max(dim=-1, keepdim=True)[0]   # (B, T, 1)
             offset_cue = output_dict['reg_offset_output'].max(dim=-1, keepdim=True)[0]
