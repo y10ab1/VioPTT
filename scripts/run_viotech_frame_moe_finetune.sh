@@ -20,7 +20,7 @@ fi
 
 TB="${WORKSPACE}/tb"
 PRETRAIN_PATH="${WORKSPACE}/checkpoints/transcriptor_model.pth"
-MODEL_TAG="vioptt_viotech_frame_moe_v0.1_spectralfull_mixed_flageolet_0.2"
+MODEL_TAG="vioptt_viotech_frame_moe_v0.1_viotech_mixed_mosavpt"
 
 cd "${WORKSPACE}/piano_transcription"
 
@@ -39,9 +39,7 @@ python3 pytorch/main_contrast.py train \
     --resume_iteration=0 \
     --early_stop=10000 \
     --device 3 \
-    --dataset viotech_mixed_flageolet \
-    --flageolet_dir /mnt/hdd/mosavpt_hdf5_only_flageolet \
-    --flageolet_ratio 0.2 \
+    --dataset viotech_mixed_mosavpt \
     --contrast_weight=0.0 \
     --ctc_weight=0.0 \
     --num_workers=8 \
@@ -51,4 +49,5 @@ python3 pytorch/main_contrast.py train \
     --technique_moe_zone_pt_weight=0.0 \
     --technique_frame_moe_weight=0.1 \
     --frame_moe_balance_coeff=0.001 \
+    --fmoe_spectral_expert=0 \
     

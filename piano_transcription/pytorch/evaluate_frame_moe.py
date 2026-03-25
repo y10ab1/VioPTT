@@ -25,6 +25,7 @@ import numpy as np
 import torch
 
 from models_contrast import Regress_onset_offset_frame_velocity_CRNN
+from moe_frame_multiscale import FrameMultiScaleMoEConfig
 from pytorch_utils import move_data_to_device
 from data_generator import CustomDataset, CustomTestSampler, collate_fn
 import config
@@ -214,6 +215,10 @@ def evaluate(args):
     fps = config.frames_per_second
     segment_seconds = config.segment_seconds
 
+    fmoe_spectral = bool(getattr(args, 'fmoe_spectral_expert', 1))
+    frame_moe_cfg = FrameMultiScaleMoEConfig(use_spectral_expert=fmoe_spectral)
+    print(f'Frame-MoE spectral expert: {fmoe_spectral}')
+
     model = Regress_onset_offset_frame_velocity_CRNN(
         frames_per_second=fps,
         classes_num=config.classes_num,
@@ -223,6 +228,7 @@ def evaluate(args):
         predict_technique_moe_zone=False,
         predict_technique_moe_zone_pt=False,
         predict_technique_frame_moe=True,
+        frame_moe_config=frame_moe_cfg,
     )
 
     checkpoint = torch.load(args.checkpoint_path, map_location='cpu', weights_only=False)
@@ -389,5 +395,7 @@ if __name__ == '__main__':
     parser.add_argument('--rwc_split', type=str, default='test',
                         choices=['train', 'test'])
     parser.add_argument('--rwc_fold', type=int, default=0)
+    parser.add_argument('--fmoe_spectral_expert', type=int, default=1, choices=[0, 1],
+                        help='Must match training config: 1=spectral expert, 0=no spectral')
     args = parser.parse_args()
     evaluate(args)

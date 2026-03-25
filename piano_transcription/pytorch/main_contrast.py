@@ -36,6 +36,7 @@ from losses import (
     frame_multiscale_moe_losses,
 )
 from evaluate import SegmentEvaluator
+from moe_frame_multiscale import FrameMultiScaleMoEConfig
 import config
 
 from pytorch_metric_learning import losses, reducers, miners
@@ -94,12 +95,14 @@ def train(args):
     moe_zone_pt_balance_coeff = getattr(args, 'moe_zone_pt_balance_coeff', 0.001)
     technique_frame_moe_weight = getattr(args, 'technique_frame_moe_weight', 0.0)
     frame_moe_balance_coeff = getattr(args, 'frame_moe_balance_coeff', 0.001)
+    fmoe_spectral_expert = bool(getattr(args, 'fmoe_spectral_expert', 1))
     focal_gamma = getattr(args, 'focal_gamma', 0.0)
     print('technique weight: ', technique_weight)
     print('technique MoE weight: ', technique_moe_weight)
     print('technique MoE-Zone weight: ', technique_moe_zone_weight)
     print('technique MoE-Zone-PerTask weight: ', technique_moe_zone_pt_weight)
     print('technique Frame-MoE weight: ', technique_frame_moe_weight)
+    print('Frame-MoE spectral expert: ', fmoe_spectral_expert)
     if focal_gamma > 0:
         print('focal loss gamma: ', focal_gamma)
 
@@ -175,6 +178,9 @@ def train(args):
 
     # Model
     Model = eval(model_type)
+    frame_moe_cfg = FrameMultiScaleMoEConfig(
+        use_spectral_expert=fmoe_spectral_expert,
+    ) if technique_frame_moe_weight > 0 else None
     model = Model(
         frames_per_second=frames_per_second,
         classes_num=classes_num,
@@ -184,6 +190,7 @@ def train(args):
         predict_technique_moe_zone=(technique_moe_zone_weight > 0),
         predict_technique_moe_zone_pt=(technique_moe_zone_pt_weight > 0),
         predict_technique_frame_moe=(technique_frame_moe_weight > 0),
+        frame_moe_config=frame_moe_cfg,
     )
     aux_contrast_onset_model = nn.Linear(512, 128)
     aux_contrast_offset_model = nn.Linear(512, 128)
@@ -203,7 +210,7 @@ def train(args):
         raise Exception('Incorrect argumentation!')
     
     # Dataset & Samplers
-    if dataset in ['mosa', 'mosapt', 'mixed', 'rwc', 'rwc_tech', 'rwc_tech_note_wav', 'viotech', 'viotech_mixed_flageolet']:
+    if dataset in ['mosa', 'mosapt', 'mixed', 'rwc', 'rwc_tech', 'rwc_tech_note_wav', 'viotech', 'viotech_mixed_mosavpt']:
         if dataset == 'mixed':
             # Build MOSA and MOSAPT datasets
             hdf5s_dir_mosa = os.path.join(workspace, 'hdf5s', 'mosa')
@@ -520,13 +527,12 @@ def train(args):
                     batch_size=batch_size,
                     mini_data=mini_data,
                 )
-            elif dataset == 'viotech_mixed_flageolet':
+            elif dataset == 'viotech_mixed_mosavpt':
                 hdf5s_dir_viotech = os.path.join(workspace, 'hdf5s', 'viotech')
-                hdf5s_dir_flageolet = args.flageolet_dir
-                print(f'Creating mixed viotech + flageolet datasets...')
+                hdf5s_dir_mosavpt = args.mosavpt_dir
+                print(f'Creating mixed viotech + mosavpt datasets...')
                 print(f'  viotech dir:   {hdf5s_dir_viotech}')
-                print(f'  flageolet dir: {hdf5s_dir_flageolet}')
-                print(f'  flageolet_ratio: {args.flageolet_ratio}')
+                print(f'  mosavpt dir: {hdf5s_dir_mosavpt}')
 
                 train_dataset_vt = CustomDataset(
                     hdf5s_dir=hdf5s_dir_viotech,
@@ -537,7 +543,7 @@ def train(args):
                     include_technique_label=True,
                 )
                 train_dataset_fl = CustomDataset(
-                    hdf5s_dir=hdf5s_dir_flageolet,
+                    hdf5s_dir=hdf5s_dir_mosavpt,
                     segment_seconds=segment_seconds,
                     frames_per_second=frames_per_second,
                     max_note_shift=max_note_shift,
@@ -554,7 +560,7 @@ def train(args):
                     mini_data=mini_data,
                 )
                 train_sampler_fl = CustomSampler(
-                    hdf5s_dir=hdf5s_dir_flageolet,
+                    hdf5s_dir=hdf5s_dir_mosavpt,
                     split='train',
                     segment_seconds=segment_seconds,
                     hop_seconds=hop_seconds,
@@ -563,35 +569,35 @@ def train(args):
                 )
 
                 class MixedDatasetVF(object):
-                    def __init__(self, vt_ds, fl_ds):
+                    def __init__(self, vt_ds, mos_ds):
                         self.vt_ds = vt_ds
-                        self.fl_ds = fl_ds
+                        self.mos_ds = mos_ds
                     def __getitem__(self, tagged_meta):
                         src, meta = tagged_meta
                         if src == 'viotech':
                             return self.vt_ds[meta]
                         else:
-                            return self.fl_ds[meta]
+                            return self.mos_ds[meta]
 
                 train_dataset = MixedDatasetVF(train_dataset_vt, train_dataset_fl)
 
                 class MixedBatchSamplerVF(object):
-                    def __init__(self, sampler_vt, sampler_fl, flageolet_ratio=0.5):
+                    def __init__(self, sampler_vt, sampler_mos, ratio=0.5):
                         self.sampler_vt = sampler_vt
-                        self.sampler_fl = sampler_fl
-                        self.flageolet_ratio = flageolet_ratio
+                        self.sampler_mos = sampler_mos
+                        self.ratio = ratio
                     def __iter__(self):
                         iter_vt = iter(self.sampler_vt)
-                        iter_fl = iter(self.sampler_fl)
+                        iter_mos = iter(self.sampler_mos)
                         while True:
-                            use_fl = (np.random.rand() < self.flageolet_ratio)
-                            if use_fl:
+                            use_mos = (np.random.rand() < self.ratio)
+                            if use_mos:
                                 try:
-                                    batch = next(iter_fl)
-                                    yield [('flageolet', m) for m in batch]
+                                    batch = next(iter_mos)
+                                    yield [('mosavpt', m) for m in batch]
                                     continue
                                 except StopIteration:
-                                    iter_fl = iter(self.sampler_fl)
+                                    iter_mos = iter(self.sampler_mos)
                             try:
                                 batch = next(iter_vt)
                                 yield [('viotech', m) for m in batch]
@@ -603,17 +609,18 @@ def train(args):
                         state = {}
                         if hasattr(self.sampler_vt, 'state_dict'):
                             state['sampler_vt'] = self.sampler_vt.state_dict()
-                        if hasattr(self.sampler_fl, 'state_dict'):
-                            state['sampler_fl'] = self.sampler_fl.state_dict()
+                        if hasattr(self.sampler_mos, 'state_dict'):
+                            state['sampler_mos'] = self.sampler_mos.state_dict()
                         return state
                     def load_state_dict(self, state):
                         if 'sampler_vt' in state and hasattr(self.sampler_vt, 'load_state_dict'):
                             self.sampler_vt.load_state_dict(state['sampler_vt'])
-                        if 'sampler_fl' in state and hasattr(self.sampler_fl, 'load_state_dict'):
-                            self.sampler_fl.load_state_dict(state['sampler_fl'])
+                        if 'sampler_mos' in state and hasattr(self.sampler_mos, 'load_state_dict'):
+                            self.sampler_mos.load_state_dict(state['sampler_mos'])
 
                 train_sampler = MixedBatchSamplerVF(
-                    train_sampler_vt, train_sampler_fl, flageolet_ratio=args.flageolet_ratio)
+                    train_sampler_vt, train_sampler_fl, ratio=args.mosavpt_ratio
+                )
 
                 evaluate_dataset_vt = CustomDataset(
                     hdf5s_dir=hdf5s_dir_viotech,
@@ -622,41 +629,41 @@ def train(args):
                     max_note_shift=0,
                     include_technique_label=True,
                 )
-                evaluate_dataset_fl = CustomDataset(
-                    hdf5s_dir=hdf5s_dir_flageolet,
+                evaluate_dataset_mos = CustomDataset(
+                    hdf5s_dir=hdf5s_dir_mosavpt,
                     segment_seconds=segment_seconds,
                     frames_per_second=frames_per_second,
                     max_note_shift=0,
                     include_technique_label=True,
                 )
-                evaluate_dataset = MixedDatasetVF(evaluate_dataset_vt, evaluate_dataset_fl)
+                evaluate_dataset = MixedDatasetVF(evaluate_dataset_vt, evaluate_dataset_mos)
 
                 class MixedEvalBatchSamplerVF(object):
-                    def __init__(self, sampler_vt, sampler_fl, flageolet_ratio=0.5):
+                    def __init__(self, sampler_vt, sampler_mos, mos_ratio=0.5):
                         self.sampler_vt = sampler_vt
-                        self.sampler_fl = sampler_fl
-                        self.flageolet_ratio = flageolet_ratio
+                        self.sampler_mos = sampler_mos
+                        self.mos_ratio = mos_ratio
                     def __iter__(self):
                         iter_vt = iter(self.sampler_vt)
-                        iter_fl = iter(self.sampler_fl)
+                        iter_mos = iter(self.sampler_mos)
                         vt_done = False
-                        fl_done = False
+                        mos_done = False
                         while True:
-                            use_fl = (np.random.rand() < self.flageolet_ratio)
-                            if use_fl and not fl_done:
+                            use_mos = (np.random.rand() < self.mos_ratio)
+                            if use_mos and not mos_done:
                                 try:
-                                    batch = next(iter_fl)
-                                    yield [('flageolet', m) for m in batch]
+                                    batch = next(iter_mos)
+                                    yield [('mosavpt', m) for m in batch]
                                     continue
                                 except StopIteration:
-                                    fl_done = True
+                                    mos_done = True
                             if not vt_done:
                                 try:
                                     batch = next(iter_vt)
                                     yield [('viotech', m) for m in batch]
                                 except StopIteration:
                                     vt_done = True
-                            if vt_done and fl_done:
+                            if vt_done and mos_done:
                                 break
                     def __len__(self):
                         return -1
@@ -668,11 +675,11 @@ def train(args):
                         batch_size=batch_size, mini_data=mini_data,
                     ),
                     CustomTestSampler(
-                        hdf5s_dir=hdf5s_dir_flageolet, split='train',
+                        hdf5s_dir=hdf5s_dir_mosavpt, split='train',
                         segment_seconds=segment_seconds, hop_seconds=hop_seconds,
                         batch_size=batch_size, mini_data=mini_data,
                     ),
-                    flageolet_ratio=0.5,
+                    mos_ratio=0.5,
                 )
                 evaluate_test_sampler = MixedEvalBatchSamplerVF(
                     CustomTestSampler(
@@ -681,11 +688,11 @@ def train(args):
                         batch_size=batch_size, mini_data=mini_data,
                     ),
                     CustomTestSampler(
-                        hdf5s_dir=hdf5s_dir_flageolet, split='test',
+                        hdf5s_dir=hdf5s_dir_mosavpt, split='test',
                         segment_seconds=segment_seconds, hop_seconds=hop_seconds,
                         batch_size=batch_size, mini_data=mini_data,
                     ),
-                    flageolet_ratio=0.5,
+                    mos_ratio=0.5,
                 )
             else:
                 train_dataset = CustomDataset(
@@ -1187,7 +1194,7 @@ if __name__ == '__main__':
     parser_train.add_argument('--mini_data', action='store_true', default=False)
     parser_train.add_argument('--device', type=int, default=None, help='-1 for CPU, 0 for GPU 0, 1 for GPU 1, etc.')
     parser_train.add_argument('--pretrain_path', type=str, default=None)
-    parser_train.add_argument('--dataset', type=str, choices=['mosa', 'maestro', 'mosapt', 'mixed', 'rwc', 'rwc_tech', 'rwc_tech_note_wav', 'viotech', 'viotech_mixed_flageolet'], default='mosa')
+    parser_train.add_argument('--dataset', type=str, choices=['mosa', 'maestro', 'mosapt', 'mixed', 'rwc', 'rwc_tech', 'rwc_tech_note_wav', 'viotech', 'viotech_mixed_mosavpt'], default='mosa')
     parser_train.add_argument('--logdir', type=str, required=True)
     parser_train.add_argument('--model_tag', type=str, required=True)
     parser_train.add_argument('--contrast_weight', type=float, default=0.0)
@@ -1196,10 +1203,10 @@ if __name__ == '__main__':
     parser_train.add_argument('--use_cosine_annealing_warm_restarts', action='store_true', default=False)
     parser_train.add_argument('--technique_weight', type=float, default=0.0)
     parser_train.add_argument('--mosa_ratio', type=float, default=0.5)
-    parser_train.add_argument('--flageolet_dir', type=str, default='/mnt/hdd/mosavpt_hdf5_only_flageolet',
-                              help='Directory of flageolet H5 files for viotech_mixed_flageolet')
-    parser_train.add_argument('--flageolet_ratio', type=float, default=0.5,
-                              help='Probability of sampling from flageolet in viotech_mixed_flageolet')
+    parser_train.add_argument('--mosavpt_dir', type=str, default='/root/VioPTT/hdf5s/mosapt',
+                              help='Directory of mosavpt H5 files for viotech_mixed_mosavpt')
+    parser_train.add_argument('--mosavpt_ratio', type=float, default=0.5,
+                              help='Probability of sampling from mosavpt in viotech_mixed_mosavpt')
     parser_train.add_argument('--num_workers', type=int, default=8)
     parser_train.add_argument('--rwc_h5_path', type=str, default='~/data/rwc_processed_data.h5')
     parser_train.add_argument('--rwc_train_ratio', type=float, default=0.9)
@@ -1222,6 +1229,8 @@ if __name__ == '__main__':
         help='Weight for Frame-level Multi-Scale MoE technique loss (0 = disabled)')
     parser_train.add_argument('--frame_moe_balance_coeff', type=float, default=0.001,
         help='Coefficient for Frame MoE load-balance auxiliary loss')
+    parser_train.add_argument('--fmoe_spectral_expert', type=int, default=1, choices=[0, 1],
+        help='Enable (1) or disable (0) spectral expert in Frame MoE (default: 1)')
     parser_train.add_argument('--focal_gamma', type=float, default=0.0,
         help='Focal loss gamma for technique CE losses (0 = standard CE, 2.0 recommended)')
     args = parser.parse_args()

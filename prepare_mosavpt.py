@@ -171,7 +171,7 @@ def process_file(wav_path, csv_path, technique, output_dir, mapping, target_sr=N
 def main():
     parser = argparse.ArgumentParser(description="Convert MOSA_VPT dataset to H5 for Viotech")
     parser.add_argument("--data_dir", default="/mnt/hdd/MOSA_VPT", help="Root directory of MOSA_VPT")
-    parser.add_argument("--output_dir", default="/mnt/hdd/mosavpt_hdf5_only_flageolet", help="Output directory for H5 files")
+    parser.add_argument("--output_dir", default="/mnt/hdd/mosavpt_hdf5_all_for_viotech_model", help="Output directory for H5 files")
     parser.add_argument("--mapping_file", default="mapping_config.json", help="Path to JSON mapping file")
     parser.add_argument("--target_sr", type=int, default=16000, help="Target sample rate (default: 16000)")
     parser.add_argument("--legato_threshold", type=float, default=LEGATO_THRESHOLD_SEC,
