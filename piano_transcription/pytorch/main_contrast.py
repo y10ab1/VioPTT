@@ -873,6 +873,19 @@ def train(args):
     # print('GPU number: {}'.format(torch.cuda.device_count()))
     # model = torch.nn.DataParallel(model)
     
+    # Best-checkpoint tracking & patience-based early stopping
+    patience = getattr(args, 'patience', 0)
+    best_metric_name = getattr(args, 'best_metric', 'fmoe_loss_technique')
+    best_metric_higher_better = best_metric_name.endswith('_ap') or best_metric_name.endswith('_acc')
+    best_metric_val = float('-inf') if best_metric_higher_better else float('inf')
+    best_iteration = 0
+    best_checkpoint_path = os.path.join(checkpoints_dir, 'best_model.pth')
+    patience_active = patience > 0
+    if patience_active:
+        logging.info(f'Patience-based early stopping enabled: '
+                     f'metric={best_metric_name}, patience={patience}, '
+                     f'higher_better={best_metric_higher_better}')
+
     print(f'Training model...')
     train_bgn_time = time.time()
 
@@ -916,6 +929,31 @@ def train(args):
             logging.info(
                 'Train time: {:.3f} s, validate time: {:.3f} s'
                 ''.format(train_time, validate_time))
+
+            # Best-checkpoint tracking on test (validation) set
+            if patience_active and test_statistics and best_metric_name in test_statistics:
+                current_val = test_statistics[best_metric_name]
+                improved = (current_val > best_metric_val if best_metric_higher_better
+                            else current_val < best_metric_val)
+                if improved:
+                    best_metric_val = current_val
+                    best_iteration = iteration
+                    ckpt = {'iteration': iteration,
+                            'model': model.state_dict(),
+                            'sampler': train_sampler.state_dict(),
+                            'best_metric': best_metric_name,
+                            'best_metric_val': best_metric_val}
+                    torch.save(ckpt, best_checkpoint_path)
+                    logging.info(f'Best model saved: {best_metric_name}='
+                                 f'{best_metric_val:.6f} at iter {iteration}')
+                else:
+                    steps_since = iteration - best_iteration
+                    logging.info(f'No improvement for {steps_since} steps '
+                                 f'(best {best_metric_name}={best_metric_val:.6f} '
+                                 f'at iter {best_iteration}, patience={patience})')
+                    if steps_since >= patience:
+                        logging.info(f'Early stopping triggered at iter {iteration}')
+                        break
 
             train_bgn_time = time.time()
         
@@ -1233,6 +1271,11 @@ if __name__ == '__main__':
         help='Enable (1) or disable (0) spectral expert in Frame MoE (default: 1)')
     parser_train.add_argument('--focal_gamma', type=float, default=0.0,
         help='Focal loss gamma for technique CE losses (0 = standard CE, 2.0 recommended)')
+    parser_train.add_argument('--patience', type=int, default=0,
+        help='Patience for early stopping based on validation metric (0 = disabled, use --early_stop as max iter)')
+    parser_train.add_argument('--best_metric', type=str, default='fmoe_loss_technique',
+        help='Metric to monitor for best checkpoint (e.g. fmoe_loss_technique, frame_ap). '
+             'Metrics ending with _ap or _acc are treated as higher-is-better.')
     args = parser.parse_args()
     args.filename = get_filename(__file__)
 

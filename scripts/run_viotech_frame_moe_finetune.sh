@@ -20,7 +20,7 @@ fi
 
 TB="${WORKSPACE}/tb"
 PRETRAIN_PATH="${WORKSPACE}/checkpoints/transcriptor_model.pth"
-MODEL_TAG="vioptt_viotech_frame_moe_v0.1_viotech_mixed_mosavpt"
+MODEL_TAG="vioptt_viotech_frame_moe_v2.0_viotech_mixed_mosavpt_reproduce"
 
 cd "${WORKSPACE}/piano_transcription"
 
