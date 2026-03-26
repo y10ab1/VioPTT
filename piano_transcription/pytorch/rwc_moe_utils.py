@@ -19,15 +19,12 @@ import numpy as np
 
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), '..', 'utils'))
 import config
+from technique_label_utils import get_technique_labels
 
 MAX_NOTES_PER_SEGMENT = 128
 
-RWC_TECHNIQUE_MAP = {
-    'flageolet': {'tonal': 2, 'artic': 0, 'legato': 0},
-    'normal':    {'tonal': 0, 'artic': 0, 'legato': 0},
-    'pizzicato': {'tonal': 1, 'artic': 0, 'legato': 0},
-    'spiccato':  {'tonal': 0, 'artic': 3, 'legato': 0},
-}
+_label_cfg = get_technique_labels()
+RWC_TECHNIQUE_MAP = _label_cfg.rwc_technique_map
 RWC_DEFAULT_MAP = {'tonal': 0, 'artic': 0, 'legato': 0}
 
 

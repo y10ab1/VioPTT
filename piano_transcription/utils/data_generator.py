@@ -628,6 +628,9 @@ class CustomDataset(object):
         # self.technique_classes = ['legato', 'pizzicato', 'spiccato', 'sustain', 'no_technique']
         self.technique_classes = ['flageolet', 'normal', 'pizzicato', 'spiccato', 'no_technique']
 
+        from technique_label_utils import get_technique_labels
+        self._label_cfg = get_technique_labels()
+
         self.random_state = np.random.RandomState(1234)
 
         self.target_processor = TargetProcessor(self.segment_seconds, 
@@ -749,6 +752,9 @@ class CustomDataset(object):
                             continue
                         if pitch in pending:
                             onset_t, tv, av, lv = pending.pop(pitch)
+                            tv = self._label_cfg.remap_tonal(tv)
+                            av = self._label_cfg.remap_artic(av)
+                            lv = self._label_cfg.remap_legato(lv)
                             offset_t = evt_times[i]
                             if offset_t > start_time and onset_t < end_time:
                                 local_on = max(0.0, onset_t - start_time)
@@ -762,7 +768,6 @@ class CustomDataset(object):
                                         bw0 = max(0, f0 - bow_change_half_width)
                                         bw1 = min(frames_num, f0 + bow_change_half_width + 1)
                                         legato_roll[bw0:bw1] = 0
-                                    # Collect note-level label
                                     if note_count < MN:
                                         note_onset_frames[note_count] = f0
                                         note_offset_frames[note_count] = f1

@@ -13,6 +13,7 @@ from sklearn import metrics
 from pytorch_utils import forward_dataloader
 from losses import tonal_technique_loss, articulation_loss, legato_loss
 from moe_frame_multiscale import frame_moe_technique_losses
+from technique_label_utils import get_technique_labels
 
 def mae(target, output, mask):
     if mask is None:
@@ -147,8 +148,9 @@ class SegmentEvaluator(object):
             if 'frame_roll' in output_dict:
                 active_mask = output_dict['frame_roll'].sum(axis=-1) > 0  # (N, T)
 
-            TONAL_NAMES = {0: 'none', 1: 'pizzicato', 2: 'harmonics', 3: 'openstring'}
-            ARTIC_NAMES = {0: 'none', 1: 'release', 2: 'staccato', 3: 'spiccato'}
+            _lcfg = get_technique_labels()
+            TONAL_NAMES = _lcfg.tonal_names
+            ARTIC_NAMES = _lcfg.artic_names
 
             for logits_key, target_key, class_names, prefix in [
                 ('fmoe_tonal_logits', 'tonal_technique', TONAL_NAMES, 'fmoe_tonal'),

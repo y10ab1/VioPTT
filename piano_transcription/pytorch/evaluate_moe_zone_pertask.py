@@ -26,11 +26,13 @@ import torch
 from models_contrast import Regress_onset_offset_frame_velocity_CRNN
 from pytorch_utils import move_data_to_device
 from data_generator import CustomDataset, CustomTestSampler, collate_fn
+from technique_label_utils import get_technique_labels
 import config
 
-TONAL_NAMES = {0: 'none', 1: 'pizzicato', 2: 'harmonics', 3: 'openstring'}
-ARTIC_NAMES = {0: 'none', 1: 'release', 2: 'staccato', 3: 'spiccato'}
-LEGATO_NAMES = {0: 'bow_change', 1: 'sustained'}
+_label_cfg = get_technique_labels()
+TONAL_NAMES = _label_cfg.tonal_names
+ARTIC_NAMES = _label_cfg.artic_names
+LEGATO_NAMES = _label_cfg.legato_names
 EXPERT_ROLES = {0: 'Onset', 1: 'Body', 2: 'Offset', 3: 'Holistic'}
 
 RWC_LABEL_MAP_DESC = {
