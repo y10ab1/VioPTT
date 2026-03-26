@@ -20,7 +20,7 @@ fi
 
 TB="${WORKSPACE}/tb"
 PRETRAIN_PATH="${WORKSPACE}/checkpoints/transcriptor_model.pth"
-MODEL_TAG="vioptt_viotech_frame_moe_v2.0_viotech_mixed_mosavpt_reproduce"
+MODEL_TAG="vioptt_viotech_frame_moe_reduced_viotech_mixed_mosavpt"
 
 cd "${WORKSPACE}/piano_transcription"
 
@@ -38,7 +38,7 @@ python3 pytorch/main_contrast.py train \
     --reduce_iteration=1000 \
     --resume_iteration=0 \
     --early_stop=10000 \
-    --device 3 \
+    --device 2 \
     --dataset viotech_mixed_mosavpt \
     --contrast_weight=0.0 \
     --ctc_weight=0.0 \
@@ -50,4 +50,5 @@ python3 pytorch/main_contrast.py train \
     --technique_frame_moe_weight=0.1 \
     --frame_moe_balance_coeff=0.001 \
     --fmoe_spectral_expert=0 \
+    --technique_label_config="${WORKSPACE}/config/technique_label_config_reduced.json" \
     

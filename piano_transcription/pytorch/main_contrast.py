@@ -1276,10 +1276,15 @@ if __name__ == '__main__':
     parser_train.add_argument('--best_metric', type=str, default='fmoe_loss_technique',
         help='Metric to monitor for best checkpoint (e.g. fmoe_loss_technique, frame_ap). '
              'Metrics ending with _ap or _acc are treated as higher-is-better.')
+    parser_train.add_argument('--technique_label_config', type=str, default=None,
+        help='Path to technique_label_config JSON (default: config/technique_label_config.json)')
     args = parser.parse_args()
     args.filename = get_filename(__file__)
 
     if args.mode == 'train':
+        if args.technique_label_config:
+            from technique_label_utils import get_technique_labels
+            get_technique_labels(args.technique_label_config)
         train(args)
 
     else:
