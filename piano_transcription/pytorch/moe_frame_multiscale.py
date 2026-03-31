@@ -151,12 +151,12 @@ class FrameMultiScaleMoEHead(nn.Module):
     """Frame-level MoE with multi-scale temporal experts + transcription cues.
 
     Forward returns:
-        tonal_logits   (B, T, 4)
-        artic_logits   (B, T, 4)
-        legato_prob    (B, T, 1)
-        gate_tonal     (B, T, 3)
-        gate_artic     (B, T, 3)
-        gate_legato    (B, T, 3)
+        tonal_logits       (B, T, 4)
+        artic_logits       (B, T, 4)
+        bow_change_prob    (B, T, 1)  — 1.0 = bow_change, 0.0 = sustained
+        gate_tonal         (B, T, E)
+        gate_artic         (B, T, E)
+        gate_legato        (B, T, E)
     """
 
     def __init__(self, cfg: FrameMultiScaleMoEConfig = None):
@@ -316,7 +316,8 @@ def frame_moe_technique_losses(output_dict, target_dict, device=None, focal_gamm
 
     Output keys: fmoe_tonal_logits, fmoe_artic_logits, fmoe_legato_prob,
                  fmoe_gate_tonal, fmoe_gate_artic, fmoe_gate_legato
-    Target keys: tonal_technique (B, T), articulation (B, T), legato (B, T)
+    Target keys: tonal_technique (B, T), articulation (B, T),
+                 legato (B, T) — soft float [0,1], 1.0=bow_change peak
     """
     dev = device
 
@@ -351,7 +352,8 @@ def frame_moe_technique_losses(output_dict, target_dict, device=None, focal_gamm
     loss_tonal = _frame_ce('fmoe_tonal_logits', 'tonal_technique')
     loss_artic = _frame_ce('fmoe_artic_logits', 'articulation')
 
-    # Legato — BCE
+    # Legato — positive-weighted BCE on soft bow_change regression target
+    # Target is a Gaussian-peaked float in [0,1]: 1.0 = bow_change, 0.0 = sustained
     loss_legato = torch.tensor(0.0, device=dev)
     if 'fmoe_legato_prob' in output_dict and 'legato' in target_dict:
         pred = output_dict['fmoe_legato_prob'].squeeze(-1)
@@ -359,12 +361,18 @@ def frame_moe_technique_losses(output_dict, target_dict, device=None, focal_gamm
         T = min(pred.shape[1], tgt.shape[1])
         pred = pred[:, :T]
         tgt = tgt[:, :T]
+
+        def _weighted_bce(p, t):
+            bce = F.binary_cross_entropy(p, t, reduction='none')
+            w = torch.where(t > 0.1, 5.0, 1.0)
+            return (bce * w).mean()
+
         if active_mask is not None:
             m = active_mask[:, :T]
             if m.any():
-                loss_legato = F.binary_cross_entropy(pred[m], tgt[m])
+                loss_legato = _weighted_bce(pred[m], tgt[m])
         else:
-            loss_legato = F.binary_cross_entropy(pred.reshape(-1), tgt.reshape(-1))
+            loss_legato = _weighted_bce(pred.reshape(-1), tgt.reshape(-1))
 
     # Per-task balance losses
     bal_tonal = _frame_balance_loss(output_dict.get('fmoe_gate_tonal'), active_mask, dev)

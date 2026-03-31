@@ -151,10 +151,10 @@ def articulation_loss(output_dict, target_dict, device=None, use_active_mask=Tru
 
 
 def legato_loss(output_dict, target_dict, device=None, use_active_mask=True):
-    """Frame-level BCE loss for legato (binary).
+    """Positive-weighted BCE on soft bow_change regression target.
 
-    output_dict['legato_output']: (B, T, 1) sigmoid probabilities
-    target_dict['legato']:        (B, T)    int labels in {0, 1}
+    output_dict['legato_output']: (B, T, 1) sigmoid probabilities (1=bow_change)
+    target_dict['legato']:        (B, T)    float [0,1] soft regression target
     """
     key_out, key_tgt = 'legato_output', 'legato'
     if (key_out not in output_dict) or (key_tgt not in target_dict):
@@ -183,7 +183,9 @@ def legato_loss(output_dict, target_dict, device=None, use_active_mask=True):
             else:
                 return torch.tensor(0.0, device=pred.device)
 
-    return F.binary_cross_entropy(pred_1d, targets_1d)
+    bce = F.binary_cross_entropy(pred_1d, targets_1d, reduction='none')
+    w = torch.where(targets_1d > 0.1, 5.0, 1.0)
+    return (bce * w).mean()
 
 
 def viotech_technique_losses(output_dict, target_dict, device=None, use_active_mask=True):

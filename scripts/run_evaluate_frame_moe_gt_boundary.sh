@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# Evaluate Frame-level Multi-Scale MoE technique classification (+ optional RWC)
-# End-to-end: no GT note boundaries needed
-# Expert 0: Onset specialist | Expert 1: Note specialist | Expert 2: Phrase specialist
+# GT-boundary evaluation of Frame-level Multi-Scale MoE technique classification
+# Model predicts frame-level technique outputs using its own features + transcription cues
+# Evaluation uses GT note boundaries and GT note-level labels
+# → Isolates technique classification accuracy from transcription errors
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -23,7 +24,8 @@ fi
 cd "${WORKSPACE}/piano_transcription"
 
 echo "============================================"
-echo "  Frame-level Multi-Scale MoE Evaluation"
+echo "  Frame MoE GT-BOUNDARY Evaluation"
+echo "  (GT note boundaries, technique-only accuracy)"
 echo "============================================"
 echo "  Checkpoint : ${CHECKPOINT}"
 echo "  HDF5s dir  : ${HDF5S_DIR}"
@@ -43,7 +45,7 @@ else
 fi
 echo ""
 
-python3 pytorch/evaluate_frame_moe.py \
+python3 pytorch/evaluate_frame_moe_gt_boundary.py \
     --checkpoint_path "$CHECKPOINT" \
     --hdf5s_dir "$HDF5S_DIR" \
     --split "$SPLIT" \

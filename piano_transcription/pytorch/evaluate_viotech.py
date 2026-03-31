@@ -37,7 +37,7 @@ import config
 _label_cfg = get_technique_labels()
 TONAL_NAMES = _label_cfg.tonal_names
 ARTIC_NAMES = _label_cfg.artic_names
-LEGATO_NAMES = _label_cfg.legato_names
+LEGATO_NAMES = {0: 'sustained', 1: 'bow_change'}
 
 
 # ── Evaluation loop ───────────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ def _run_eval_loop(model, test_loader, device, dataset_label='dataset'):
             legato_pred = (legato_prob[:, :T] > 0.5).long()
             active = active[:, :T]
 
-            # GT
+            # GT (legato is soft float [0,1] → binarize: 1=bow_change)
             tonal_gt = batch_data_dict.get('tonal_technique')
             artic_gt = batch_data_dict.get('articulation')
             legato_gt = batch_data_dict.get('legato')
@@ -92,7 +92,7 @@ def _run_eval_loop(model, test_loader, device, dataset_label='dataset'):
 
             tonal_gt = tonal_gt[:, :T]
             artic_gt = artic_gt[:, :T]
-            legato_gt = legato_gt[:, :T]
+            legato_gt = (legato_gt[:, :T] > 0.5).long()
 
             B = active.shape[0]
             for b in range(B):

@@ -722,8 +722,8 @@ class CustomDataset(object):
             if has_viotech:
                 tonal_roll = np.zeros(frames_num, dtype=np.int32)
                 artic_roll = np.zeros(frames_num, dtype=np.int32)
-                legato_roll = np.ones(frames_num, dtype=np.int32)
-                bow_change_half_width = 2
+                legato_roll = np.zeros(frames_num, dtype=np.float32)
+                bow_change_onsets = []
 
                 # Note-level arrays (padded to max_notes)
                 MN = self.max_notes
@@ -765,9 +765,7 @@ class CustomDataset(object):
                                     tonal_roll[f0:f1] = tv
                                     artic_roll[f0:f1] = av
                                     if lv == 0:
-                                        bw0 = max(0, f0 - bow_change_half_width)
-                                        bw1 = min(frames_num, f0 + bow_change_half_width + 1)
-                                        legato_roll[bw0:bw1] = 0
+                                        bow_change_onsets.append(f0)
                                     if note_count < MN:
                                         note_onset_frames[note_count] = f0
                                         note_offset_frames[note_count] = f1
@@ -776,6 +774,17 @@ class CustomDataset(object):
                                         note_artic[note_count] = av
                                         note_leg[note_count] = lv
                                         note_count += 1
+
+                # Soft regression target for bow_change detection (Gaussian peaks)
+                if bow_change_onsets:
+                    _sigma = 2.0
+                    _radius = int(3 * _sigma)
+                    for cf in bow_change_onsets:
+                        t0 = max(0, cf - _radius)
+                        t1 = min(frames_num, cf + _radius + 1)
+                        ts = np.arange(t0, t1)
+                        vals = np.exp(-0.5 * ((ts - cf) / _sigma) ** 2)
+                        legato_roll[t0:t1] = np.maximum(legato_roll[t0:t1], vals)
 
                 # Frame-level rolls (backward compatible)
                 data_dict['tonal_technique'] = tonal_roll

@@ -186,7 +186,7 @@ class SegmentEvaluator(object):
             # Legato accuracy
             if 'fmoe_legato_prob' in output_dict and 'legato' in output_dict:
                 pred_l = (output_dict['fmoe_legato_prob'].squeeze(-1) > 0.5).astype(np.int64)
-                tgt_l = output_dict['legato'].astype(np.int64)
+                tgt_l = (output_dict['legato'] > 0.5).astype(np.int64)
                 T = min(pred_l.shape[1], tgt_l.shape[1])
                 pred_l = pred_l[:, :T]
                 tgt_l = tgt_l[:, :T]

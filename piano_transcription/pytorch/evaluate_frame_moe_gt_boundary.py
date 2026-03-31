@@ -1,12 +1,14 @@
-"""Note-level evaluation of Frame-level Multi-Scale MoE technique classification.
+"""GT-boundary evaluation of Frame-level Multi-Scale MoE technique classification.
 
-End-to-end: uses the model's OWN transcription branch (onset/offset/frame
-regression) to detect note boundaries — NO ground-truth note boundaries at
-inference.  Frame-level technique predictions are then aggregated per detected
-note via **average-logits-then-argmax**.
+Model predicts frame-level technique outputs using its own acoustic features
+and transcription cues (onset/offset/frame probabilities) — NO GT information
+is fed to the model at inference time.
 
-GT technique labels are also aggregated per detected note span via majority
-vote over the frame-level GT arrays.
+Evaluation uses **GT note boundaries** to slice into the frame-level
+predictions, and compares against **GT note-level labels** directly.
+
+This isolates technique classification accuracy from transcription errors,
+making it the fairest metric for reporting technique recognition performance.
 
 Supports:
   1. Viotech  (--hdf5s_dir)  — default
@@ -21,13 +23,11 @@ sys.path.insert(1, os.path.join(os.path.dirname(__file__), '..', 'utils'))
 import argparse
 import numpy as np
 import torch
-from collections import Counter
 
 from models_contrast import Regress_onset_offset_frame_velocity_CRNN
 from moe_frame_multiscale import FrameMultiScaleMoEConfig
 from pytorch_utils import move_data_to_device
 from data_generator import CustomDataset, CustomTestSampler, collate_fn
-from utilities import RegressionPostProcessor
 from technique_label_utils import get_technique_labels
 import config
 
@@ -37,81 +37,13 @@ ARTIC_NAMES = _label_cfg.artic_names
 LEGATO_NAMES = {0: 'sustained', 1: 'bow_change'}
 EXPERT_NAMES = {0: 'Onset', 1: 'Note', 2: 'Phrase', 3: 'Spectral'}
 
-ONSET_THRESHOLD = 0.3
-OFFSET_THRESHOLD = 0.3
-FRAME_THRESHOLD = 0.1
-PEDAL_OFFSET_THRESHOLD = 0.2
 
-
-def _detect_notes_from_output(output_dict_np, fps, classes_num):
-    """Run RegressionPostProcessor on a single sample's transcription outputs.
-
-    Args:
-        output_dict_np: dict with numpy arrays (T, C) for reg_onset_output,
-                        reg_offset_output, frame_output, velocity_output.
-        fps: frames per second
-        classes_num: number of pitch classes (88)
-
-    Returns:
-        list of (onset_frame, offset_frame, midi_note) tuples
-    """
-    post_processor = RegressionPostProcessor(
-        frames_per_second=fps,
-        classes_num=classes_num,
-        onset_threshold=ONSET_THRESHOLD,
-        offset_threshold=OFFSET_THRESHOLD,
-        frame_threshold=FRAME_THRESHOLD,
-        pedal_offset_threshold=PEDAL_OFFSET_THRESHOLD,
-    )
-
-    est_on_off_note_vels = post_processor.output_dict_to_note_pedal_arrays(
-        output_dict_np)[0]
-
-    if est_on_off_note_vels is None or len(est_on_off_note_vels) == 0:
-        return []
-
-    notes = []
-    for onset_t, offset_t, midi_note, vel in est_on_off_note_vels:
-        f0 = max(0, int(round(onset_t * fps)))
-        f1 = max(f0 + 1, int(round(offset_t * fps)))
-        notes.append((f0, f1, int(midi_note)))
-    return notes
-
-
-def _majority_vote(arr):
-    """Return the most common element in a 1-D array."""
-    if len(arr) == 0:
-        return 0
-    counts = Counter(arr.tolist())
-    return counts.most_common(1)[0][0]
-
-
-def _match_note_to_gt(det_onset, det_pitch, gt_onsets, gt_pitches, tolerance=5):
-    """Match a detected note to the closest GT note by pitch + onset proximity.
-
-    Returns the index into gt_onsets/gt_pitches, or None if no match within
-    *tolerance* frames.
-    """
-    pitch_mask = gt_pitches == det_pitch
-    if not pitch_mask.any():
-        return None
-    dists = np.abs(gt_onsets.astype(np.int64) - int(det_onset))
-    dists[~pitch_mask] = 999999
-    best = int(dists.argmin())
-    if dists[best] <= tolerance:
-        return best
-    return None
-
-
-def _run_note_eval_loop(model, test_loader, device, fps, classes_num,
-                        dataset_label='dataset'):
-    """Note-level evaluation loop using model-predicted note boundaries."""
+def _run_gt_boundary_eval(model, test_loader, device, dataset_label='dataset'):
+    """Note-level evaluation using GT note boundaries on model frame predictions."""
     all_tonal_pred, all_tonal_gt = [], []
     all_artic_pred, all_artic_gt = [], []
     all_legato_pred, all_legato_gt = [], []
     total_notes = 0
-    legato_matched = 0
-    legato_unmatched = 0
 
     gate_global = {'tonal': None, 'artic': None, 'legato': None}
     gate_by_class = {'tonal': {}, 'artic': {}, 'legato': {}}
@@ -132,19 +64,15 @@ def _run_note_eval_loop(model, test_loader, device, fps, classes_num,
             legato_prob = output_dict['fmoe_legato_prob'].squeeze(-1)
             T_fmoe = tonal_logits.shape[1]
 
-            tonal_gt_frames = batch_data_dict.get('tonal_technique')
-            artic_gt_frames = batch_data_dict.get('articulation')
-            if tonal_gt_frames is None:
-                continue
-
-            # Note-level GT for legato (directly from annotation)
             gt_note_onsets = batch_data_dict.get('note_onset_frames')
-            gt_note_pitches = batch_data_dict.get('note_pitches')
+            gt_note_offsets = batch_data_dict.get('note_offset_frames')
+            gt_note_tonal = batch_data_dict.get('note_tonal_technique')
+            gt_note_artic = batch_data_dict.get('note_articulation')
             gt_note_legato = batch_data_dict.get('note_legato')
             gt_num_notes = batch_data_dict.get('num_notes')
-            has_note_gt = (gt_note_onsets is not None
-                           and gt_note_legato is not None
-                           and gt_num_notes is not None)
+
+            if gt_note_onsets is None or gt_num_notes is None:
+                continue
 
             gp_tonal = output_dict.get('fmoe_gate_tonal')
             gp_artic = output_dict.get('fmoe_gate_artic')
@@ -152,80 +80,45 @@ def _run_note_eval_loop(model, test_loader, device, fps, classes_num,
 
             B = tonal_logits.shape[0]
             for b in range(B):
-                sample_output = {
-                    'reg_onset_output':
-                        output_dict['reg_onset_output'][b].cpu().numpy(),
-                    'reg_offset_output':
-                        output_dict['reg_offset_output'][b].cpu().numpy(),
-                    'frame_output':
-                        output_dict['frame_output'][b].cpu().numpy(),
-                    'velocity_output':
-                        output_dict['velocity_output'][b].cpu().numpy(),
-                }
+                n_gt = int(gt_num_notes[b].item())
+                if n_gt == 0:
+                    continue
 
-                detected_notes = _detect_notes_from_output(
-                    sample_output, fps, classes_num)
+                for i in range(n_gt):
+                    f0 = int(gt_note_onsets[b, i].item())
+                    f1 = int(gt_note_offsets[b, i].item())
 
-                # Prepare per-sample GT note arrays for legato matching
-                if has_note_gt:
-                    n_gt = int(gt_num_notes[b].item())
-                    b_gt_onsets = gt_note_onsets[b, :n_gt].cpu().numpy()
-                    b_gt_pitches = gt_note_pitches[b, :n_gt].cpu().numpy()
-                    # Original HDF5 label: 0=bow_change, 1=sustained → flip
-                    b_gt_legato = 1 - gt_note_legato[b, :n_gt].cpu().numpy()
-                else:
-                    n_gt = 0
-
-                T_gt = tonal_gt_frames.shape[1]
-                T = min(T_fmoe, T_gt)
-
-                for f0, f1, midi_note in detected_notes:
-                    if f0 >= T or f1 <= 0:
+                    if f0 >= T_fmoe or f1 <= 0:
                         continue
                     f0 = max(f0, 0)
-                    f1 = min(f1, T)
+                    f1 = min(f1, T_fmoe)
                     if f1 <= f0:
                         continue
 
+                    # Predictions — from model output, no GT info used
                     t_avg = tonal_logits[b, f0:f1, :].mean(dim=0)
                     a_avg = artic_logits[b, f0:f1, :].mean(dim=0)
-
-                    # Bow_change prediction: peak near onset
                     onset_window = min(f0 + 5, f1)
                     l_peak = legato_prob[b, f0:onset_window].max().item()
-                    l_pred = 1 if l_peak > 0.5 else 0
 
-                    t_gt_maj = _majority_vote(
-                        tonal_gt_frames[b, f0:f1].cpu().numpy())
-                    a_gt_maj = _majority_vote(
-                        artic_gt_frames[b, f0:f1].cpu().numpy())
-
-                    # Legato GT: match to GT note and use note-level label
-                    l_gt = None
-                    if n_gt > 0:
-                        idx = _match_note_to_gt(
-                            f0, midi_note, b_gt_onsets, b_gt_pitches)
-                        if idx is not None:
-                            l_gt = int(b_gt_legato[idx])
+                    # GT — directly from note-level annotation
+                    t_gt = int(gt_note_tonal[b, i].item())
+                    a_gt = int(gt_note_artic[b, i].item())
+                    # HDF5 label: 0=bow_change, 1=sustained → flip to 1=bow_change
+                    l_gt = 1 - int(gt_note_legato[b, i].item())
 
                     all_tonal_pred.append(t_avg.argmax().item())
-                    all_tonal_gt.append(t_gt_maj)
+                    all_tonal_gt.append(t_gt)
                     all_artic_pred.append(a_avg.argmax().item())
-                    all_artic_gt.append(a_gt_maj)
-
-                    if l_gt is not None:
-                        all_legato_pred.append(l_pred)
-                        all_legato_gt.append(l_gt)
-                        legato_matched += 1
-                    else:
-                        legato_unmatched += 1
+                    all_artic_gt.append(a_gt)
+                    all_legato_pred.append(1 if l_peak > 0.5 else 0)
+                    all_legato_gt.append(l_gt)
                     total_notes += 1
 
-                    l_gt_for_gate = l_gt if l_gt is not None else l_pred
                     for task, gp, gt_val in [
-                        ('tonal', gp_tonal, t_gt_maj),
-                        ('artic', gp_artic, a_gt_maj),
-                        ('legato', gp_legato, l_gt_for_gate),
+                        ('tonal', gp_tonal, t_gt),
+                        ('artic', gp_artic, a_gt),
+                        ('legato', gp_legato, l_gt),
                     ]:
                         if gp is None:
                             continue
@@ -240,11 +133,7 @@ def _run_note_eval_loop(model, test_loader, device, fps, classes_num,
 
             if (batch_idx + 1) % 20 == 0:
                 print(f'  [{dataset_label}] batch {batch_idx + 1}: '
-                      f'{total_notes} notes accumulated')
-
-    print(f'  [{dataset_label}] Legato note matching: '
-          f'{legato_matched} matched, {legato_unmatched} unmatched '
-          f'({legato_matched / max(legato_matched + legato_unmatched, 1) * 100:.1f}%)')
+                      f'{total_notes} GT notes evaluated')
 
     return (np.array(all_tonal_gt, dtype=int), np.array(all_tonal_pred, dtype=int),
             np.array(all_artic_gt, dtype=int), np.array(all_artic_pred, dtype=int),
@@ -252,12 +141,14 @@ def _run_note_eval_loop(model, test_loader, device, fps, classes_num,
             gate_global, gate_by_class, total_notes)
 
 
+# ── Reporting (shared with other evaluate scripts) ──────────────────────────
+
 def _print_results(banner, tonal_gt, tonal_pred, artic_gt, artic_pred,
                    legato_gt, legato_pred, gate_global, gate_by_class,
                    total_notes):
     print()
     print('=' * 70)
-    print(f'  {banner} — Total notes evaluated: {total_notes}')
+    print(f'  {banner} — Total GT notes evaluated: {total_notes}')
     print('=' * 70)
     print()
 
@@ -366,6 +257,8 @@ def _print_multiclass_report(title, gt, pred, class_names):
     print()
 
 
+# ── Main ────────────────────────────────────────────────────────────────────
+
 def evaluate(args):
     device = (torch.device(f'cuda:{args.device}')
               if args.device >= 0 and torch.cuda.is_available()
@@ -378,8 +271,6 @@ def evaluate(args):
     fmoe_spectral = bool(getattr(args, 'fmoe_spectral_expert', 1))
     frame_moe_cfg = FrameMultiScaleMoEConfig(use_spectral_expert=fmoe_spectral)
     print(f'Frame-MoE spectral expert: {fmoe_spectral}')
-    print(f'Note detection thresholds: onset={ONSET_THRESHOLD}, '
-          f'offset={OFFSET_THRESHOLD}, frame={FRAME_THRESHOLD}')
 
     model = Regress_onset_offset_frame_velocity_CRNN(
         frames_per_second=fps,
@@ -433,20 +324,21 @@ def evaluate(args):
         pin_memory=True,
     )
 
-    print(f'Evaluating (NOTE-LEVEL, predicted boundaries) on '
-          f'{args.split} set from {hdf5s_dir}')
-    print(f'Aggregation: avg logits over predicted note span → argmax')
-    print(f'GT per note: majority vote over frame-level GT in same span')
-    print(f'Device: {device}  |  batch_size: {args.batch_size}')
+    print(f'Evaluating (GT BOUNDARIES) on {args.split} set from {hdf5s_dir}')
+    print(f'  Prediction : model frame-level output (no GT info)')
+    print(f'  Boundaries : GT note onset/offset')
+    print(f'  Labels     : GT note-level annotation')
+    print(f'  Device: {device}  |  batch_size: {args.batch_size}')
     print()
 
-    results = _run_note_eval_loop(model, test_loader, device, fps, classes_num,
-                                  dataset_label='Viotech')
+    results = _run_gt_boundary_eval(model, test_loader, device,
+                                    dataset_label='Viotech')
     if results[-1] > 0:
-        _print_results('Viotech Frame-MoE NOTE-LEVEL (predicted boundaries)',
-                       *results)
+        _print_results(
+            'Viotech Frame-MoE GT-BOUNDARY (technique-only accuracy)',
+            *results)
     else:
-        print('No notes detected in the viotech test set.')
+        print('No GT notes found in the viotech test set.')
 
     # ---- RWC evaluation (optional) ----
     rwc_path = getattr(args, 'rwc_h5_path', None)
@@ -459,7 +351,7 @@ def evaluate(args):
         from rwc_moe_utils import RWCMoEDataset, RWCMoETestSampler
 
         print(f'\n{"=" * 70}')
-        print(f'  RWC Note-Level Evaluation (predicted boundaries)')
+        print(f'  RWC GT-Boundary Evaluation')
         print(f'{"=" * 70}')
 
         rwc_dataset = RWCMoEDataset(
@@ -486,19 +378,19 @@ def evaluate(args):
             pin_memory=True,
         )
 
-        rwc_results = _run_note_eval_loop(model, rwc_loader, device, fps,
-                                          classes_num, dataset_label='RWC')
+        rwc_results = _run_gt_boundary_eval(model, rwc_loader, device,
+                                            dataset_label='RWC')
         if rwc_results[-1] > 0:
-            _print_results('RWC Frame-MoE NOTE-LEVEL (cross-dataset)',
+            _print_results('RWC Frame-MoE GT-BOUNDARY (cross-dataset)',
                            *rwc_results)
         else:
-            print('[RWC] No notes detected.')
+            print('[RWC] No GT notes found.')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='Note-level evaluation of Frame MoE technique '
-                    '(predicted note boundaries, no GT boundaries)')
+        description='GT-boundary evaluation of Frame MoE technique '
+                    '(model predicts, GT boundaries + labels for evaluation)')
     parser.add_argument('--checkpoint_path', type=str, required=True)
     parser.add_argument('--hdf5s_dir', type=str, required=True)
     parser.add_argument('--split', type=str, default='test',
