@@ -37,6 +37,9 @@ import config
 _label_cfg = get_technique_labels()
 TONAL_NAMES = _label_cfg.tonal_names
 ARTIC_NAMES = _label_cfg.artic_names
+# Config class IDs: 0=bow_change, 1=sustained.  After Gaussian binarisation
+# (>0.5) the convention flips: 1=bow_change, 0=sustained.  LEGATO_NAMES uses
+# the *post-binarisation* convention which is what gt/pred arrays actually hold.
 LEGATO_NAMES = {0: 'sustained', 1: 'bow_change'}
 
 

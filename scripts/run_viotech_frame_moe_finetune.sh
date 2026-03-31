@@ -20,7 +20,7 @@ fi
 
 TB="${WORKSPACE}/tb"
 PRETRAIN_PATH="${WORKSPACE}/checkpoints/transcriptor_model.pth"
-MODEL_TAG="vioptt_viotech_frame_moe_reduced_all_lregression_viotech_mixed_mosavpt"
+MODEL_TAG="vioptt_viotech_frame_moe_reduced_all_lregression_mosavpt"
 
 cd "${WORKSPACE}/piano_transcription"
 
@@ -39,7 +39,7 @@ python3 pytorch/main_contrast.py train \
     --resume_iteration=0 \
     --early_stop=10000 \
     --device 4 \
-    --dataset viotech_mixed_mosavpt \
+    --dataset mosapt \
     --contrast_weight=0.0 \
     --ctc_weight=0.0 \
     --num_workers=8 \

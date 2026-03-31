@@ -5,9 +5,9 @@ produces note-level data compatible with the MoE evaluation loop:
   waveform, note_onset_frames, note_offset_frames, note_pitches,
   note_tonal_technique, note_articulation, note_legato, num_notes
 
-Label mapping (RWC technique → viotech MoE labels):
+Label mapping (RWC technique → viotech MoE labels, from technique_label_config.json):
   flageolet  →  tonal=2(harmonics),  artic=0(none),     legato=0(bow_change)
-  normal     →  tonal=0(none),       artic=0(none),     legato=1(sustained)
+  normal     →  tonal=0(none),       artic=0(none),     legato=0(bow_change)
   pizzicato  →  tonal=1(pizzicato),  artic=0(none),     legato=0(bow_change)
   spiccato   →  tonal=0(none),       artic=3(spiccato), legato=0(bow_change)
 """
@@ -221,7 +221,11 @@ class RWCMoEDataset:
             # Build frame-level rolls from note-level labels (for frame-level eval)
             tonal_roll = np.zeros(frames_num, dtype=np.int32)
             artic_roll = np.zeros(frames_num, dtype=np.int32)
-            legato_roll = np.zeros(frames_num, dtype=np.int32)
+            # Legato uses Gaussian-peaked float [0,1] to match Viotech
+            # convention: 1.0 = bow_change onset, 0.0 = sustained.
+            # Config class ID 0 = bow_change → collect those onsets.
+            legato_roll = np.zeros(frames_num, dtype=np.float32)
+            bow_change_onsets = []
             frame_roll = np.zeros((frames_num, 88), dtype=np.float32)
             for i in range(note_count):
                 f0 = int(note_onset_frames[i])
@@ -229,9 +233,19 @@ class RWCMoEDataset:
                 if f1 > f0:
                     tonal_roll[f0:f1] = note_tonal[i]
                     artic_roll[f0:f1] = note_artic[i]
-                    legato_roll[f0:f1] = note_legato[i]
+                    if note_legato[i] == 0:  # 0 = bow_change in config
+                        bow_change_onsets.append(f0)
                     pitch_idx = max(0, min(87, note_pitches[i] - 21))
                     frame_roll[f0:f1, pitch_idx] = 1.0
+            if bow_change_onsets:
+                _sigma = 2.0
+                _radius = int(3 * _sigma)
+                for cf in bow_change_onsets:
+                    t0 = max(0, cf - _radius)
+                    t1 = min(frames_num, cf + _radius + 1)
+                    ts = np.arange(t0, t1)
+                    vals = np.exp(-0.5 * ((ts - cf) / _sigma) ** 2)
+                    legato_roll[t0:t1] = np.maximum(legato_roll[t0:t1], vals)
             data_dict['tonal_technique'] = tonal_roll
             data_dict['articulation'] = artic_roll
             data_dict['legato'] = legato_roll
