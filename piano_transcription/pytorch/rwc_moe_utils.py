@@ -63,13 +63,16 @@ class RWCMoETestSampler:
         self.batch_size = batch_size
         self.max_evaluate_iteration = 9999
 
-        train_files, test_files = _get_file_split(fold_id)
-        allowed = set(train_files if split == 'train' else test_files)
+        if split == 'all':
+            allowed = None
+        else:
+            train_files, test_files = _get_file_split(fold_id)
+            allowed = set(train_files if split == 'train' else test_files)
 
         self.segment_list = []
         with h5py.File(rwc_h5_path, 'r') as f:
             for fk in sorted(f.keys()):
-                if not fk.startswith('file_') or fk not in allowed:
+                if not fk.startswith('file_') or (allowed is not None and fk not in allowed):
                     continue
                 g = f[fk]
                 sr = int(g.attrs.get('sample_rate', 44100))

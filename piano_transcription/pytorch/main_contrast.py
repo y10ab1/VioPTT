@@ -35,7 +35,7 @@ from losses import (
     pertask_zone_moe_technique_losses,
     frame_multiscale_moe_losses,
 )
-from evaluate import SegmentEvaluator
+from evaluate import SegmentEvaluator, evaluate_rwc_frame_moe
 from moe_frame_multiscale import FrameMultiScaleMoEConfig
 import config
 
@@ -103,8 +103,9 @@ def train(args):
     print('technique MoE-Zone-PerTask weight: ', technique_moe_zone_pt_weight)
     print('technique Frame-MoE weight: ', technique_frame_moe_weight)
     print('Frame-MoE spectral expert: ', fmoe_spectral_expert)
-    if focal_gamma > 0:
-        print('focal loss gamma: ', focal_gamma)
+    print('focal loss gamma: ', focal_gamma)
+    if dataset == 'viotech_mixed_mosavpt':
+        print('mosavpt_ratio: ', getattr(args, 'mosavpt_ratio', 0.5))
 
     sample_rate = config.sample_rate
     segment_seconds = config.segment_seconds
@@ -806,6 +807,43 @@ def train(args):
     # Evaluator
     evaluator = SegmentEvaluator(model, batch_size)
 
+    # RWC evaluation dataloader (cross-dataset eval during training)
+    rwc_eval_loader = None
+    rwc_eval_h5 = getattr(args, 'rwc_eval_h5_path', None)
+    if rwc_eval_h5:
+        rwc_eval_h5 = os.path.expanduser(rwc_eval_h5)
+        if os.path.isfile(rwc_eval_h5):
+            from rwc_moe_utils import RWCMoEDataset, RWCMoETestSampler
+            rwc_eval_dataset = RWCMoEDataset(
+                rwc_h5_path=rwc_eval_h5,
+                segment_seconds=segment_seconds,
+                frames_per_second=frames_per_second,
+            )
+            rwc_eval_sampler = RWCMoETestSampler(
+                rwc_h5_path=rwc_eval_h5,
+                split=getattr(args, 'rwc_eval_split', 'test'),
+                segment_seconds=segment_seconds,
+                hop_seconds=hop_seconds,
+                batch_size=batch_size,
+                fold_id=getattr(args, 'rwc_eval_fold', 0),
+            )
+            rwc_max_iter = getattr(args, 'rwc_eval_max_iterations', 200)
+            max_rwc = len(rwc_eval_sampler.segment_list) // max(batch_size, 1)
+            rwc_eval_sampler.max_evaluate_iteration = min(rwc_max_iter, max_rwc)
+            rwc_eval_loader = torch.utils.data.DataLoader(
+                dataset=rwc_eval_dataset,
+                batch_sampler=rwc_eval_sampler,
+                collate_fn=collate_fn,
+                num_workers=num_workers,
+                pin_memory=True,
+            )
+            logging.info(f'RWC evaluation enabled: {rwc_eval_h5} '
+                         f'(split={args.rwc_eval_split}, fold={args.rwc_eval_fold}, '
+                         f'segments={len(rwc_eval_sampler.segment_list)}, '
+                         f'max_batches={rwc_eval_sampler.max_evaluate_iteration})')
+        else:
+            logging.warning(f'RWC eval H5 not found: {rwc_eval_h5}, skipping RWC evaluation.')
+
     # Statistics
     statistics_container = StatisticsContainer(statistics_path)
     
@@ -892,7 +930,7 @@ def train(args):
     for batch_data_dict in train_loader:
 
         # Evaluation 
-        if iteration % 100 == 0:# and iteration > 0:
+        if iteration % 1000 == 0:# and iteration > 0:
             logging.info('------------------------------------')
             logging.info('Iteration: {}'.format(iteration))
 
@@ -918,9 +956,21 @@ def train(args):
                     if isinstance(value, (int, float)):
                         writer.add_scalar(f'test/{key}', value, iteration)
 
+            # RWC cross-dataset evaluation
+            rwc_statistics = {}
+            if rwc_eval_loader is not None:
+                logging.info('Evaluating on RWC set...')
+                rwc_statistics = evaluate_rwc_frame_moe(model, rwc_eval_loader, device)
+                logging.info('    RWC statistics: {}'.format(rwc_statistics))
+                for key, value in rwc_statistics.items():
+                    if isinstance(value, (int, float)):
+                        writer.add_scalar(f'rwc/{key}', value, iteration)
+
             statistics_container.append(iteration, evaluate_train_statistics, data_type='train')
             # statistics_container.append(iteration, validate_statistics, data_type='validation')
             statistics_container.append(iteration, test_statistics, data_type='test')
+            if rwc_statistics:
+                statistics_container.append(iteration, rwc_statistics, data_type='rwc')
             statistics_container.dump()
 
             train_time = train_fin_time - train_bgn_time
@@ -1278,6 +1328,15 @@ if __name__ == '__main__':
              'Metrics ending with _ap or _acc are treated as higher-is-better.')
     parser_train.add_argument('--technique_label_config', type=str, default=None,
         help='Path to technique_label_config JSON (default: config/technique_label_config.json)')
+    parser_train.add_argument('--rwc_eval_h5_path', type=str, default=None,
+        help='Path to RWC H5 file for cross-dataset evaluation during training (None = disabled)')
+    parser_train.add_argument('--rwc_eval_split', type=str, default='all',
+        choices=['train', 'test', 'all'],
+        help='RWC split for evaluation during training (all = entire dataset)')
+    parser_train.add_argument('--rwc_eval_fold', type=int, default=0,
+        help='RWC fold ID for evaluation during training')
+    parser_train.add_argument('--rwc_eval_max_iterations', type=int, default=200,
+        help='Max batches per RWC evaluation during training')
     args = parser.parse_args()
     args.filename = get_filename(__file__)
 

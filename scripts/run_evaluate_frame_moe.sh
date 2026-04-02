@@ -36,7 +36,7 @@ echo ""
 # Build RWC argument if file exists
 RWC_ARGS=""
 if [ -f "$RWC_H5" ]; then
-    RWC_ARGS="--rwc_h5_path $RWC_H5 --rwc_split test --rwc_fold 0"
+    RWC_ARGS="--rwc_h5_path $RWC_H5 --rwc_split all"
     echo "RWC H5 found — will evaluate on RWC as well."
 else
     echo "RWC H5 not found at ${RWC_H5} — skipping RWC evaluation."

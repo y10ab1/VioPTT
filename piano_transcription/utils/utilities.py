@@ -1556,7 +1556,7 @@ class StatisticsContainer(object):
             os.path.splitext(self.statistics_path)[0], 
             datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
 
-        self.statistics_dict = {'train': [], 'validation': [], 'test': []}
+        self.statistics_dict = {'train': [], 'validation': [], 'test': [], 'rwc': []}
 
     def append(self, iteration, statistics, data_type):
         statistics['iteration'] = iteration
@@ -1571,9 +1571,11 @@ class StatisticsContainer(object):
     def load_state_dict(self, resume_iteration):
         self.statistics_dict = pickle.load(open(self.statistics_path, 'rb'))
 
-        resume_statistics_dict = {'train': [], 'validation': [], 'test': []}
+        resume_statistics_dict = {'train': [], 'validation': [], 'test': [], 'rwc': []}
         
         for key in self.statistics_dict.keys():
+            if key not in resume_statistics_dict:
+                resume_statistics_dict[key] = []
             for statistics in self.statistics_dict[key]:
                 if statistics['iteration'] <= resume_iteration:
                     resume_statistics_dict[key].append(statistics)

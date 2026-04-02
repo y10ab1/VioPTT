@@ -397,8 +397,8 @@ if __name__ == '__main__':
     parser.add_argument('--num_workers', type=int, default=4)
     parser.add_argument('--max_iterations', type=int, default=500)
     parser.add_argument('--rwc_h5_path', type=str, default=None)
-    parser.add_argument('--rwc_split', type=str, default='test',
-                        choices=['train', 'test'])
+    parser.add_argument('--rwc_split', type=str, default='all',
+                        choices=['train', 'test', 'all'])
     parser.add_argument('--rwc_fold', type=int, default=0)
     parser.add_argument('--fmoe_spectral_expert', type=int, default=1, choices=[0, 1],
                         help='Must match training config: 1=spectral expert, 0=no spectral')
