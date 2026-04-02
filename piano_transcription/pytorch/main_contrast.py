@@ -96,6 +96,14 @@ def train(args):
     technique_frame_moe_weight = getattr(args, 'technique_frame_moe_weight', 0.0)
     frame_moe_balance_coeff = getattr(args, 'frame_moe_balance_coeff', 0.001)
     fmoe_spectral_expert = bool(getattr(args, 'fmoe_spectral_expert', 1))
+    fmoe_expert_mask_str = getattr(args, 'fmoe_expert_mask', None)
+    fmoe_expert_mask = (
+        tuple(int(x) for x in fmoe_expert_mask_str.split(','))
+        if fmoe_expert_mask_str else None
+    )
+    fmoe_top_k = getattr(args, 'fmoe_top_k', None)
+    fmoe_shared_gate = bool(getattr(args, 'fmoe_shared_gate', 0))
+    fmoe_uniform_routing = bool(getattr(args, 'fmoe_uniform_routing', 0))
     focal_gamma = getattr(args, 'focal_gamma', 0.0)
     print('technique weight: ', technique_weight)
     print('technique MoE weight: ', technique_moe_weight)
@@ -103,6 +111,10 @@ def train(args):
     print('technique MoE-Zone-PerTask weight: ', technique_moe_zone_pt_weight)
     print('technique Frame-MoE weight: ', technique_frame_moe_weight)
     print('Frame-MoE spectral expert: ', fmoe_spectral_expert)
+    print('Frame-MoE expert mask: ', fmoe_expert_mask)
+    print('Frame-MoE top-k: ', fmoe_top_k)
+    print('Frame-MoE shared gate: ', fmoe_shared_gate)
+    print('Frame-MoE uniform routing: ', fmoe_uniform_routing)
     print('focal loss gamma: ', focal_gamma)
     if dataset == 'viotech_mixed_mosavpt':
         print('mosavpt_ratio: ', getattr(args, 'mosavpt_ratio', 0.5))
@@ -179,9 +191,18 @@ def train(args):
 
     # Model
     Model = eval(model_type)
-    frame_moe_cfg = FrameMultiScaleMoEConfig(
-        use_spectral_expert=fmoe_spectral_expert,
-    ) if technique_frame_moe_weight > 0 else None
+    if technique_frame_moe_weight > 0:
+        _fmoe_kwargs = dict(
+            use_spectral_expert=fmoe_spectral_expert,
+            expert_mask=fmoe_expert_mask,
+            shared_gate=fmoe_shared_gate,
+            uniform_routing=fmoe_uniform_routing,
+        )
+        if fmoe_top_k is not None:
+            _fmoe_kwargs['top_k'] = fmoe_top_k
+        frame_moe_cfg = FrameMultiScaleMoEConfig(**_fmoe_kwargs)
+    else:
+        frame_moe_cfg = None
     model = Model(
         frames_per_second=frames_per_second,
         classes_num=classes_num,
@@ -1319,6 +1340,14 @@ if __name__ == '__main__':
         help='Coefficient for Frame MoE load-balance auxiliary loss')
     parser_train.add_argument('--fmoe_spectral_expert', type=int, default=1, choices=[0, 1],
         help='Enable (1) or disable (0) spectral expert in Frame MoE (default: 1)')
+    parser_train.add_argument('--fmoe_expert_mask', type=str, default=None,
+        help='Comma-separated expert indices to keep (e.g. "0,1,2"). None = all available')
+    parser_train.add_argument('--fmoe_top_k', type=int, default=None,
+        help='Top-k sparse gating override (0=dense). None = use config default (2)')
+    parser_train.add_argument('--fmoe_shared_gate', type=int, default=0, choices=[0, 1],
+        help='Use single shared gate for all tasks (1) vs per-task gates (0)')
+    parser_train.add_argument('--fmoe_uniform_routing', type=int, default=0, choices=[0, 1],
+        help='Bypass gating with equal 1/E weights (1) vs learned gating (0)')
     parser_train.add_argument('--focal_gamma', type=float, default=0.0,
         help='Focal loss gamma for technique CE losses (0 = standard CE, 2.0 recommended)')
     parser_train.add_argument('--patience', type=int, default=0,

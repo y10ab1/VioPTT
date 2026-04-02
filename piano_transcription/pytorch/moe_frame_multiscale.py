@@ -51,6 +51,10 @@ class FrameMultiScaleMoEConfig:
     balance_loss_coeff: float = 0.001
     top_k: int = 2
     use_spectral_expert: bool = True
+    # --- ablation knobs ---
+    expert_mask: tuple = None       # e.g. (0,1,2) — None means all available
+    shared_gate: bool = False       # single gate shared across tonal/artic/legato
+    uniform_routing: bool = False   # equal-weight bypass (no learned gating)
 
 
 # ---------------------------------------------------------------------------
@@ -169,29 +173,35 @@ class FrameMultiScaleMoEHead(nn.Module):
         C = cfg.cue_dim
         SP = cfg.spectral_proj_dim
 
+        # Resolve which experts are active
+        if cfg.expert_mask is not None:
+            mask = tuple(sorted(cfg.expert_mask))
+        else:
+            mask = (0, 1, 2, 3) if self.use_spectral else (0, 1, 2)
+        if 3 in mask and not self.use_spectral:
+            raise ValueError("Expert 3 (spectral) requires use_spectral_expert=True")
+        self.active_expert_ids = list(mask)
+
         # Transcription cue projections (scalar → small embedding)
         self.onset_proj = nn.Linear(1, C)
         self.offset_proj = nn.Linear(1, C)
         self.frame_proj = nn.Linear(1, C)
 
-        # Multi-scale temporal context extractors
+        # Always build all 3 temporal contexts (cheap; needed for gate input)
         self.short_ctx = _TemporalCtx(D, P, cfg.short_kernel)
         self.note_ctx = _TemporalCtx(D, P, cfg.note_kernel)
         self.phrase_ctx = _TemporalCtx(D, P, cfg.phrase_kernel,
                                        dilation=cfg.phrase_dilation)
 
-        # Expert input dims (always present: 3 temporal experts)
-        exp0_in = P + C           # short_ctx + onset_cue
-        exp1_in = P + C           # note_ctx  + frame_cue
-        exp2_in = P + 3 * C       # phrase_ctx + all three cues
+        # Expert input dims
+        _exp_in = {
+            0: P + C,       # short_ctx + onset_cue
+            1: P + C,       # note_ctx  + frame_cue
+            2: P + 3 * C,   # phrase_ctx + all three cues
+        }
 
-        experts = [
-            _Expert(exp0_in, cfg.expert_hidden, cfg.shared_dim, cfg.expert_dropout),
-            _Expert(exp1_in, cfg.expert_hidden, cfg.shared_dim, cfg.expert_dropout),
-            _Expert(exp2_in, cfg.expert_hidden, cfg.shared_dim, cfg.expert_dropout),
-        ]
-
-        gate_in = 3 * P + 3 * C  # 3 temporal contexts + 3 cues
+        # Gate input always includes all 3 temporal contexts + 3 cues
+        gate_in = 3 * P + 3 * C
 
         if self.use_spectral:
             self.spectral_cnn = _DedicatedSpectralCNN(out_dim=SP)
@@ -200,18 +210,28 @@ class FrameMultiScaleMoEHead(nn.Module):
                 nn.LayerNorm(P),
                 nn.GELU(),
             )
-            exp3_in = SP + P + C  # spectral_cnn + gru_feat_proj + frame_cue
-            experts.append(
-                _Expert(exp3_in, cfg.expert_hidden, cfg.shared_dim, cfg.expert_dropout))
-            gate_in += SP + P     # add spectral ctx + gru proj to gate
+            _exp_in[3] = SP + P + C   # spectral_cnn + gru_feat_proj + frame_cue
+            gate_in += SP + P         # add spectral ctx + gru proj to gate
 
+        experts = []
+        for eid in self.active_expert_ids:
+            experts.append(
+                _Expert(_exp_in[eid], cfg.expert_hidden, cfg.shared_dim,
+                        cfg.expert_dropout))
         self.experts = nn.ModuleList(experts)
         num_experts = len(experts)
 
         gate_hidden = cfg.expert_hidden // 2
-        self.gate_tonal = _Gate(gate_in, num_experts, gate_hidden, cfg.gate_dropout)
-        self.gate_artic = _Gate(gate_in, num_experts, gate_hidden, cfg.gate_dropout)
-        self.gate_legato = _Gate(gate_in, num_experts, gate_hidden, cfg.gate_dropout)
+        if cfg.shared_gate:
+            self.gate_shared = _Gate(gate_in, num_experts, gate_hidden,
+                                     cfg.gate_dropout)
+        else:
+            self.gate_tonal = _Gate(gate_in, num_experts, gate_hidden,
+                                    cfg.gate_dropout)
+            self.gate_artic = _Gate(gate_in, num_experts, gate_hidden,
+                                    cfg.gate_dropout)
+            self.gate_legato = _Gate(gate_in, num_experts, gate_hidden,
+                                     cfg.gate_dropout)
 
         self.ln_tonal = nn.LayerNorm(cfg.shared_dim)
         self.ln_artic = nn.LayerNorm(cfg.shared_dim)
@@ -228,6 +248,12 @@ class FrameMultiScaleMoEHead(nn.Module):
             return self._top_k_gating(logits, self.cfg.top_k)
         return F.softmax(logits, dim=-1)
 
+    def _uniform_probs(self, ref_tensor):
+        """Equal 1/E weights with shape (B, T, E)."""
+        B, T = ref_tensor.shape[:2]
+        E = len(self.active_expert_ids)
+        return torch.full((B, T, E), 1.0 / E, device=ref_tensor.device)
+
     def forward(self, features, onset_prob, offset_prob, frame_prob,
                 logmel=None, conv2d_map=None):
         """
@@ -239,32 +265,20 @@ class FrameMultiScaleMoEHead(nn.Module):
             logmel:      (B, 1, T, 229) BN-normalised log-mel spectrogram
             conv2d_map:  (B, C_in, T, F) (unused, kept for backward compat)
         """
-        # Project transcription cues
-        c_onset = F.gelu(self.onset_proj(onset_prob))    # (B, T, C)
+        c_onset = F.gelu(self.onset_proj(onset_prob))
         c_offset = F.gelu(self.offset_proj(offset_prob))
         c_frame = F.gelu(self.frame_proj(frame_prob))
 
-        # Multi-scale temporal contexts
-        s_short = self.short_ctx(features)   # (B, T, P)
-        s_note = self.note_ctx(features)     # (B, T, P)
-        s_phrase = self.phrase_ctx(features)  # (B, T, P)
+        s_short = self.short_ctx(features)
+        s_note = self.note_ctx(features)
+        s_phrase = self.phrase_ctx(features)
 
-        # Expert-specific inputs (3 temporal experts always present)
-        inp_0 = torch.cat([s_short, c_onset], dim=-1)
-        inp_1 = torch.cat([s_note, c_frame], dim=-1)
-        inp_2 = torch.cat([s_phrase, c_onset, c_offset, c_frame], dim=-1)
-
-        expert_list = [
-            self.experts[0](inp_0),
-            self.experts[1](inp_1),
-            self.experts[2](inp_2),
-        ]
-        gate_parts = [s_short, s_note, s_phrase]
-
+        # Pre-compute spectral features if the CNN is present
+        s_spec = f_proj = None
         if self.use_spectral:
             T_feat = s_short.shape[1]
             if logmel is not None:
-                s_spec = self.spectral_cnn(logmel)  # (B, T', SP)
+                s_spec = self.spectral_cnn(logmel)
                 T_spec = s_spec.shape[1]
                 if T_spec != T_feat:
                     s_spec = s_spec[:, :T_feat, :] if T_spec > T_feat else \
@@ -273,19 +287,38 @@ class FrameMultiScaleMoEHead(nn.Module):
                 s_spec = torch.zeros(features.shape[0], T_feat,
                                      self.cfg.spectral_proj_dim,
                                      device=features.device)
-            f_proj = self.feat_proj(features)  # (B, T, P)
-            inp_3 = torch.cat([s_spec, f_proj, c_frame], dim=-1)
-            expert_list.append(self.experts[3](inp_3))
-            gate_parts.extend([s_spec, f_proj])
+            f_proj = self.feat_proj(features)
+
+        # Build expert inputs for active experts only
+        _inp_builders = {
+            0: lambda: torch.cat([s_short, c_onset], dim=-1),
+            1: lambda: torch.cat([s_note, c_frame], dim=-1),
+            2: lambda: torch.cat([s_phrase, c_onset, c_offset, c_frame], dim=-1),
+            3: lambda: torch.cat([s_spec, f_proj, c_frame], dim=-1),
+        }
+
+        expert_list = []
+        for idx, eid in enumerate(self.active_expert_ids):
+            expert_list.append(self.experts[idx](_inp_builders[eid]()))
 
         expert_outs = torch.stack(expert_list, dim=-2)  # (B, T, E, shared_dim)
 
+        # Gate input (always full context for fair comparison)
+        gate_parts = [s_short, s_note, s_phrase]
+        if self.use_spectral:
+            gate_parts.extend([s_spec, f_proj])
         gate_parts.extend([c_onset, c_offset, c_frame])
         gate_in = torch.cat(gate_parts, dim=-1)
 
-        gp_tonal = self._get_gate_probs(self.gate_tonal, gate_in)
-        gp_artic = self._get_gate_probs(self.gate_artic, gate_in)
-        gp_legato = self._get_gate_probs(self.gate_legato, gate_in)
+        if self.cfg.uniform_routing:
+            gp_tonal = gp_artic = gp_legato = self._uniform_probs(features)
+        elif self.cfg.shared_gate:
+            gp_tonal = gp_artic = gp_legato = self._get_gate_probs(
+                self.gate_shared, gate_in)
+        else:
+            gp_tonal = self._get_gate_probs(self.gate_tonal, gate_in)
+            gp_artic = self._get_gate_probs(self.gate_artic, gate_in)
+            gp_legato = self._get_gate_probs(self.gate_legato, gate_in)
 
         def _mix(gp, ln):
             h = (gp.unsqueeze(-1) * expert_outs).sum(dim=-2)

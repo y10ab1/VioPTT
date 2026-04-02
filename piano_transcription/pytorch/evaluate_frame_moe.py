@@ -221,8 +221,25 @@ def evaluate(args):
     segment_seconds = config.segment_seconds
 
     fmoe_spectral = bool(getattr(args, 'fmoe_spectral_expert', 1))
-    frame_moe_cfg = FrameMultiScaleMoEConfig(use_spectral_expert=fmoe_spectral)
+    fmoe_mask_str = getattr(args, 'fmoe_expert_mask', None)
+    fmoe_expert_mask = (
+        tuple(int(x) for x in fmoe_mask_str.split(','))
+        if fmoe_mask_str else None
+    )
+    _fmoe_kw = dict(
+        use_spectral_expert=fmoe_spectral,
+        expert_mask=fmoe_expert_mask,
+        shared_gate=bool(getattr(args, 'fmoe_shared_gate', 0)),
+        uniform_routing=bool(getattr(args, 'fmoe_uniform_routing', 0)),
+    )
+    fmoe_top_k = getattr(args, 'fmoe_top_k', None)
+    if fmoe_top_k is not None:
+        _fmoe_kw['top_k'] = fmoe_top_k
+    frame_moe_cfg = FrameMultiScaleMoEConfig(**_fmoe_kw)
     print(f'Frame-MoE spectral expert: {fmoe_spectral}')
+    print(f'Frame-MoE expert mask: {fmoe_expert_mask}')
+    print(f'Frame-MoE shared gate: {_fmoe_kw["shared_gate"]}')
+    print(f'Frame-MoE uniform routing: {_fmoe_kw["uniform_routing"]}')
 
     model = Regress_onset_offset_frame_velocity_CRNN(
         frames_per_second=fps,
@@ -402,5 +419,13 @@ if __name__ == '__main__':
     parser.add_argument('--rwc_fold', type=int, default=0)
     parser.add_argument('--fmoe_spectral_expert', type=int, default=1, choices=[0, 1],
                         help='Must match training config: 1=spectral expert, 0=no spectral')
+    parser.add_argument('--fmoe_expert_mask', type=str, default=None,
+                        help='Comma-separated expert indices (must match training config)')
+    parser.add_argument('--fmoe_top_k', type=int, default=None,
+                        help='Top-k override (must match training config)')
+    parser.add_argument('--fmoe_shared_gate', type=int, default=0, choices=[0, 1],
+                        help='Shared gate (must match training config)')
+    parser.add_argument('--fmoe_uniform_routing', type=int, default=0, choices=[0, 1],
+                        help='Uniform routing (must match training config)')
     args = parser.parse_args()
     evaluate(args)
