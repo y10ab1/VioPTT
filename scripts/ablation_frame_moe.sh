@@ -59,6 +59,7 @@ UNIFORM=0
 BALANCE=0.001
 FOCAL=2.0
 MOSAVPT=0.2
+SEED=2026
 
 run_train() {
     local TAG="$1"
@@ -89,6 +90,7 @@ run_train() {
         --resume_iteration=0 \
         --early_stop=10000 \
         --device $DEVICE \
+        --seed $SEED \
         --dataset viotech_mixed_mosavpt \
         --contrast_weight=0.0 \
         --ctc_weight=0.0 \

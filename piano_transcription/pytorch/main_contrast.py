@@ -41,6 +41,17 @@ import config
 
 from pytorch_metric_learning import losses, reducers, miners
 from torch.optim.lr_scheduler import CosineAnnealingLR, CosineAnnealingWarmRestarts
+import random
+
+
+def set_seed(seed: int):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
 
 def train(args):
     """Train a piano transcription system.
@@ -58,6 +69,12 @@ def train(args):
       device: 'cuda' | 'cpu'
       mini_data: bool
     """
+
+    # Reproducibility
+    seed = getattr(args, 'seed', None)
+    if seed is not None:
+        set_seed(seed)
+        print(f'Random seed fixed to {seed}')
 
     # Arugments & parameters
     workspace = args.workspace
@@ -1302,6 +1319,8 @@ if __name__ == '__main__':
     parser_train.add_argument('--early_stop', type=int, required=True)
     parser_train.add_argument('--mini_data', action='store_true', default=False)
     parser_train.add_argument('--device', type=int, default=None, help='-1 for CPU, 0 for GPU 0, 1 for GPU 1, etc.')
+    parser_train.add_argument('--seed', type=int, default=2026,
+        help='Random seed for reproducibility (None = non-deterministic)')
     parser_train.add_argument('--pretrain_path', type=str, default=None)
     parser_train.add_argument('--dataset', type=str, choices=['mosa', 'maestro', 'mosapt', 'mixed', 'rwc', 'rwc_tech', 'rwc_tech_note_wav', 'viotech', 'viotech_mixed_mosavpt'], default='mosa')
     parser_train.add_argument('--logdir', type=str, required=True)
