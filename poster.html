@@ -97,7 +97,7 @@
     position: relative;
     transform-origin: top center;
     flex-shrink: 0;
-    font-size: 22pt;
+    font-size: 28pt;
     line-height: 1.45;
     overflow: hidden;
   }
@@ -148,11 +148,11 @@
   }
 
   .affiliations {
-    font-size: 20px;
+    font-size: 28px;
     color: var(--clr-muted);
     line-height: 1.5;
   }
-  .affiliations sup { font-size: 13px; }
+  .affiliations sup { font-size: 18px; }
 
   .header-right {
     display: flex;
@@ -192,7 +192,7 @@
 
   .card h2 {
     font-family: var(--font-display);
-    font-size: 34px;
+    font-size: 42px;
     font-weight: 700;
     color: var(--clr-accent);
     margin-bottom: 15px;
@@ -207,27 +207,27 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 38px;
-    height: 38px;
+    width: 44px;
+    height: 44px;
     background: var(--clr-accent);
     color: white;
     font-family: var(--font-body);
     font-weight: 700;
-    font-size: 22px;
+    font-size: 28px;
     border-radius: 50%;
     flex-shrink: 0;
   }
 
   .card h3 {
     font-family: var(--font-display);
-    font-size: 26px;
+    font-size: 34px;
     font-weight: 700;
     color: var(--clr-header);
     margin: 15px 0 8px;
   }
 
   .card p, .card li {
-    font-size: 23px;
+    font-size: 30px;
     line-height: 1.5;
     color: var(--clr-text);
   }
@@ -238,10 +238,10 @@
   .card .highlight {
     background: var(--clr-highlight);
     border-left: 4px solid var(--clr-accent2);
-    padding: 12px 19px;
+    padding: 14px 20px;
     border-radius: 0 8px 8px 0;
     margin: 12px 0;
-    font-size: 22px;
+    font-size: 28px;
   }
 
   .card .highlight strong { color: var(--clr-accent); }
@@ -249,25 +249,25 @@
   /* ───── TABLES ───── */
   .table-wrap { overflow-x: auto; margin: 11px 0; }
 
-  table { width: 100%; border-collapse: collapse; font-size: 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 28px; }
 
   table th {
     background: var(--clr-header);
     color: white;
-    padding: 10px 11px;
+    padding: 14px 16px;
     font-weight: 700;
     text-align: center;
-    font-size: 17px;
+    font-size: 28px;
   }
 
   table th:first-child { text-align: left; border-radius: 8px 0 0 0; }
   table th:last-child { border-radius: 0 8px 0 0; }
 
   table td {
-    padding: 8px 11px;
+    padding: 12px 16px;
     text-align: center;
     border-bottom: 1px solid var(--clr-border);
-    font-size: 18px;
+    font-size: 28px;
     font-family: var(--font-mono);
   }
 
@@ -275,23 +275,23 @@
     text-align: left;
     font-family: var(--font-body);
     font-weight: 600;
-    font-size: 18px;
+    font-size: 28px;
   }
 
   table tr:nth-child(even) { background: #FAFAF7; }
 
   .best { font-weight: 700; color: var(--clr-accent); }
   .second { text-decoration: underline; text-decoration-color: var(--clr-accent3); }
-  .std { font-size: 0.8em; opacity: 0.6; }
+  .std { font-size: 0.85em; opacity: 0.6; }
 
   /* ───── CONFUSION MATRIX ───── */
   .confusion-matrix {
     display: grid;
-    grid-template-columns: auto repeat(4, 1fr);
-    grid-template-rows: auto repeat(4, 1fr);
+    grid-template-columns: auto repeat(4, 120px);
+    grid-template-rows: auto repeat(4, 120px);
     gap: 6px;
     margin: 11px auto;
-    width: 85%;
+    width: fit-content;
   }
 
   .cm-label {
@@ -299,7 +299,7 @@
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 16px;
+    font-size: 24px;
     color: var(--clr-muted);
     padding: 6px;
   }
@@ -314,12 +314,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 11px 8px;
     border-radius: 8px;
     font-weight: 700;
     font-family: var(--font-mono);
-    font-size: 20px;
-    min-height: 53px;
+    font-size: 28px;
+    aspect-ratio: 1;
   }
 
   /* ───── FIGURE IMAGES ───── */
@@ -332,9 +331,9 @@
   .technique-pills { display: flex; gap: 11px; margin: 11px 0; flex-wrap: wrap; }
 
   .technique-pill {
-    padding: 8px 19px;
+    padding: 10px 22px;
     border-radius: 8px;
-    font-size: 18px;
+    font-size: 26px;
     font-weight: 600;
     color: white;
   }
@@ -351,17 +350,17 @@
     align-items: center;
     padding-top: 15px;
     border-top: 2px solid var(--clr-border);
-    font-size: 18px;
+    font-size: 26px;
     color: var(--clr-muted);
   }
 
   .footer a { color: var(--clr-accent); text-decoration: none; font-weight: 600; }
-  .footer .contact { font-family: var(--font-mono); font-size: 17px; }
+  .footer .contact { font-family: var(--font-mono); font-size: 24px; }
 
   /* ───── EQUATION ───── */
   .equation {
     font-family: var(--font-mono);
-    font-size: 18px;
+    font-size: 26px;
     background: var(--clr-highlight);
     padding: 11px 19px;
     border-radius: 8px;
@@ -381,14 +380,14 @@
   .finding-item {
     background: var(--clr-highlight);
     border-radius: 8px;
-    padding: 11px 15px;
+    padding: 14px 18px;
     border-left: 4px solid var(--clr-accent2);
-    font-size: 20px;
+    font-size: 26px;
   }
 
   .finding-item strong {
     color: var(--clr-accent);
-    font-size: 26px;
+    font-size: 34px;
     display: block;
     margin-bottom: 4px;
     font-family: var(--font-mono);
@@ -481,7 +480,7 @@
         <div style="text-align:center; margin:8px 0;">
           <img src="assets/vioptt-architecture.png" alt="VioPTT Model Architecture" style="width:100%; max-width:100%; border-radius:8px;">
         </div>
-        <p style="font-size:17px; color:var(--clr-muted); text-align:center; margin-top:4px;">Fig. 1: Overview of our technique-aware violin transcription model.</p>
+        <p style="font-size:24px; color:var(--clr-muted); text-align:center; margin-top:4px;">Fig. 1: Overview of our technique-aware violin transcription model.</p>
         <h3>Training Objective</h3>
         <div class="equation">
           ℒ = ℒ<sub>onset</sub>(BCE) + ℒ<sub>offset</sub>(BCE) + ℒ<sub>frame</sub>(BCE) + ℒ<sub>velocity</sub>(MSE) + ℒ<sub>technique</sub>(CCE)
@@ -496,20 +495,20 @@
         <h3>Datasets</h3>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:11px; margin:8px 0;">
           <div style="background:var(--clr-highlight); border-radius:8px; padding:11px 15px;">
-            <strong style="color:var(--clr-accent); font-size:20px;">MOSA</strong> <span style="font-size:17px;">(Training)</span><br>
-            <span style="font-size:20px;">19 hrs solo violin · 15 expert players · Note-level annotations with pitch, rhythm, dynamics &amp; articulation</span>
+            <strong style="color:var(--clr-accent); font-size:28px;">MOSA</strong> <span style="font-size:24px;">(Training)</span><br>
+            <span style="font-size:26px;">19 hrs solo violin · 15 expert players · Note-level annotations with pitch, rhythm, dynamics &amp; articulation</span>
           </div>
           <div style="background:var(--clr-highlight); border-radius:8px; padding:11px 15px;">
-            <strong style="color:var(--clr-accent); font-size:20px;">MOSA-VPT</strong> <span style="font-size:17px;">(Ours — Synthetic)</span><br>
-            <span style="font-size:20px;">76 hrs audio-MIDI pairs · 4 techniques balanced · Rendered via DAWDreamer + Synchron Solo Violin I</span>
+            <strong style="color:var(--clr-accent); font-size:28px;">MOSA-VPT</strong> <span style="font-size:24px;">(Ours — Synthetic)</span><br>
+            <span style="font-size:26px;">76 hrs audio-MIDI pairs · 4 techniques balanced · Rendered via DAWDreamer + Synchron Solo Violin I</span>
           </div>
           <div style="background:#f0f0ec; border-radius:8px; padding:11px 15px;">
-            <strong style="font-size:20px;">URMP</strong> / <strong style="font-size:20px;">Bach10</strong> <span style="font-size:17px;">(Test — Transcription)</span><br>
-            <span style="font-size:20px;">44 chamber pieces + 10 four-part chorales with annotated pitch and timing</span>
+            <strong style="font-size:28px;">URMP</strong> / <strong style="font-size:28px;">Bach10</strong> <span style="font-size:24px;">(Test — Transcription)</span><br>
+            <span style="font-size:26px;">44 chamber pieces + 10 four-part chorales with annotated pitch and timing</span>
           </div>
           <div style="background:#f0f0ec; border-radius:8px; padding:11px 15px;">
-            <strong style="font-size:20px;">RWC</strong> <span style="font-size:17px;">(Test — Technique)</span><br>
-            <span style="font-size:20px;">Real-world chromatic scales with multiple dynamics and playing styles</span>
+            <strong style="font-size:28px;">RWC</strong> <span style="font-size:24px;">(Test — Technique)</span><br>
+            <span style="font-size:26px;">Real-world chromatic scales with multiple dynamics and playing styles</span>
           </div>
         </div>
 
@@ -520,10 +519,10 @@
           <span class="technique-pill pill-spiccato">Spiccato</span>
           <span class="technique-pill pill-pizzicato">Pizzicato</span>
         </div>
-        <p style="font-size:20px;">MIDI scores → DAWDreamer (VST host) → Synchron Solo Violin I → key-switch + CC control → mono 16 kHz stems. Fully annotation-free and generalizable to any VST instrument.</p>
+        <p style="font-size:26px;">MIDI scores → DAWDreamer (VST host) → Synchron Solo Violin I → key-switch + CC control → mono 16 kHz stems. Fully annotation-free and generalizable to any VST instrument.</p>
 
         <h3>Pitch &amp; Timing Augmentation</h3>
-        <p style="font-size:20px;">Pitch shift (±0.1 st) · +5 dB gain · 2× random band-pass (32–4096 Hz) · Reverb (room 0.35)</p>
+        <p style="font-size:26px;">Pitch shift (±0.1 st) · +5 dB gain · 2× random band-pass (32–4096 Hz) · Reverb (room 0.35)</p>
       </div>
 
       <div class="card">
@@ -550,7 +549,7 @@
             </tbody>
           </table>
         </div>
-        <p style="font-size:17px; color:var(--clr-muted); margin-top:8px;">"FT" = fine-tuned from piano-pretrained checkpoint · "aug" = augmentation · <span class="best" style="font-size:17px;">Bold</span> = best · <span class="second" style="font-size:17px;">Underlined</span> = second-best</p>
+        <p style="font-size:24px; color:var(--clr-muted); margin-top:8px;">"FT" = fine-tuned from piano-pretrained checkpoint · "aug" = augmentation · <span class="best" style="font-size:24px;">Bold</span> = best · <span class="second" style="font-size:24px;">Underlined</span> = second-best</p>
         <div class="highlight" style="margin-top:12px;">
           <strong>Key insight:</strong> State-of-the-art performance achieved from scratch with augmentation and ~30% less data than MUSC — transfer learning gains are limited when sufficient domain-specific data are available.
         </div>
@@ -576,7 +575,7 @@
             </tbody>
           </table>
         </div>
-        <p style="font-size:17px; color:var(--clr-muted); margin-top:8px;">Mean ± std from 3 random data splits on RWC dataset. <span class="best" style="font-size:17px;">Bold</span> = best, <span class="second" style="font-size:17px;">Underlined</span> = second-best per column.</p>
+        <p style="font-size:24px; color:var(--clr-muted); margin-top:8px;">Mean ± std from 3 random data splits on RWC dataset. <span class="best" style="font-size:24px;">Bold</span> = best, <span class="second" style="font-size:24px;">Underlined</span> = second-best per column.</p>
       </div>
     </div>
 
@@ -584,40 +583,40 @@
     <div class="column">
       <div class="card">
         <h2><span class="section-num">7</span> Confusion Matrix</h2>
-        <p style="font-size:18px; margin-bottom:8px; text-align:center; color:var(--clr-muted);">Predictions aggregated across all folds</p>
+        <p style="font-size:26px; margin-bottom:8px; text-align:center; color:var(--clr-muted);">Predictions aggregated across all folds</p>
         <div class="confusion-matrix">
           <div class="cm-corner"></div>
-          <div class="cm-label" style="font-size:15px;">Flag.</div>
-          <div class="cm-label" style="font-size:15px;">Dét.</div>
-          <div class="cm-label" style="font-size:15px;">Pizz.</div>
-          <div class="cm-label" style="font-size:15px;">Spic.</div>
+          <div class="cm-label">Flag.</div>
+          <div class="cm-label">Dét.</div>
+          <div class="cm-label">Pizz.</div>
+          <div class="cm-label">Spic.</div>
 
           <div class="cm-label row-label">Flag.</div>
-          <div class="cm-cell" style="background:rgba(46,125,111,0.75); color:white;">72%</div>
-          <div class="cm-cell" style="background:rgba(46,125,111,0.15);">13%</div>
-          <div class="cm-cell" style="background:rgba(46,125,111,0.08);">7%</div>
-          <div class="cm-cell" style="background:rgba(46,125,111,0.10);">8%</div>
+          <div class="cm-cell" style="background:rgba(139,37,0,0.69); color:white;">69%</div>
+          <div class="cm-cell" style="background:rgba(139,37,0,0.04);">4%</div>
+          <div class="cm-cell" style="background:rgba(139,37,0,0.18);">18%</div>
+          <div class="cm-cell" style="background:rgba(139,37,0,0.09);">9%</div>
 
           <div class="cm-label row-label">Dét.</div>
-          <div class="cm-cell" style="background:rgba(199,91,57,0.12);">9%</div>
-          <div class="cm-cell" style="background:rgba(199,91,57,0.60); color:white;">63%</div>
-          <div class="cm-cell" style="background:rgba(199,91,57,0.05);">3%</div>
-          <div class="cm-cell" style="background:rgba(199,91,57,0.25);">25%</div>
+          <div class="cm-cell" style="background:rgba(139,37,0,0.11);">11%</div>
+          <div class="cm-cell" style="background:rgba(139,37,0,0.63); color:white;">63%</div>
+          <div class="cm-cell" style="background:rgba(139,37,0,0.02);">2%</div>
+          <div class="cm-cell" style="background:rgba(139,37,0,0.24);">24%</div>
 
           <div class="cm-label row-label">Pizz.</div>
-          <div class="cm-cell" style="background:rgba(139,105,20,0.05);">2%</div>
-          <div class="cm-cell" style="background:rgba(139,105,20,0.06);">4%</div>
-          <div class="cm-cell" style="background:rgba(139,105,20,0.85); color:white;">89%</div>
-          <div class="cm-cell" style="background:rgba(139,105,20,0.05);">5%</div>
+          <div class="cm-cell" style="background:rgba(139,37,0,0.01);">1%</div>
+          <div class="cm-cell" style="background:rgba(139,37,0,0.04);">4%</div>
+          <div class="cm-cell" style="background:rgba(139,37,0,0.89); color:white;">89%</div>
+          <div class="cm-cell" style="background:rgba(139,37,0,0.06);">6%</div>
 
           <div class="cm-label row-label">Spic.</div>
-          <div class="cm-cell" style="background:rgba(74,111,165,0.04);">2%</div>
-          <div class="cm-cell" style="background:rgba(74,111,165,0.10);">8%</div>
-          <div class="cm-cell" style="background:rgba(74,111,165,0.05);">5%</div>
-          <div class="cm-cell" style="background:rgba(74,111,165,0.82); color:white;">85%</div>
+          <div class="cm-cell" style="background:rgba(139,37,0,0.03);">3%</div>
+          <div class="cm-cell" style="background:rgba(139,37,0,0.10);">10%</div>
+          <div class="cm-cell" style="background:rgba(139,37,0,0.02);">2%</div>
+          <div class="cm-cell" style="background:rgba(139,37,0,0.85); color:white;">85%</div>
         </div>
-        <p style="font-size:16px; text-align:center; color:var(--clr-muted); margin-top:4px;">← Predicted →&emsp;&emsp;↑ True ↑</p>
-        <div class="highlight" style="margin-top:8px; font-size:18px;">
+        <p style="font-size:24px; text-align:center; color:var(--clr-muted); margin-top:4px;">← Predicted →&emsp;&emsp;↑ True ↑</p>
+        <div class="highlight" style="margin-top:8px; font-size:26px;">
           <strong>Pizzicato</strong> shows minimal misclassification (distinct acoustic character). <strong>Détaché</strong> is most confused with <strong>spiccato</strong> (both use short bow strokes).
         </div>
       </div>
@@ -627,29 +626,17 @@
         <div style="text-align:center; margin:8px 0;">
           <img src="assets/vioptt-umap.png" alt="UMAP of Note-Level Technique Embeddings" style="width:100%; max-width:100%; border-radius:8px; background:white;">
         </div>
-        <p style="font-size:17px; color:var(--clr-muted); margin-top:4px;">Fig. 3: UMAP visualization of RWC data on learned note-level embeddings. Despite training on synthetic data only, learned representations generalize to unseen real-world recordings with clear class separation.</p>
+        <p style="font-size:24px; color:var(--clr-muted); margin-top:4px;">Fig. 3: UMAP visualization of RWC data on learned note-level embeddings. Despite training on synthetic data only, learned representations generalize to unseen real-world recordings with clear class separation.</p>
       </div>
 
       <div class="card">
         <h2><span class="section-num">9</span> Conclusions &amp; Future Work</h2>
-        <div class="findings-grid">
-          <div class="finding-item">
-            <strong>93.1</strong>
-            F1<sub>no</sub> on URMP — matching SOTA with ~30% less data
-          </div>
-          <div class="finding-item">
-            <strong>77.2%</strong>
-            Macro accuracy on real-world technique classification
-          </div>
-          <div class="finding-item">
-            <strong>76 hrs</strong>
-            Synthetic technique data — no expert annotation needed
-          </div>
-          <div class="finding-item">
-            <strong>1st</strong>
-            Joint violin transcription + technique prediction model
-          </div>
-        </div>
+        <ul>
+          <li><strong>93.1</strong> F1<sub>no</sub> on URMP — matching SOTA with ~30% less data</li>
+          <li><strong>77.2%</strong> macro accuracy on real-world technique classification</li>
+          <li><strong>76 hrs</strong> synthetic technique data — no expert annotation needed</li>
+          <li><strong>1st</strong> joint violin transcription + technique prediction model</li>
+        </ul>
         <p style="margin-top:12px;"><strong>Future work:</strong> Extend synthesis framework to a broader range of techniques and other bowed string instruments (viola, cello, double bass).</p>
       </div>
     </div>
