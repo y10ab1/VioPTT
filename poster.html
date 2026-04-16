@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VioPTT – Violin Playing Technique-Aware Transcription Poster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --clr-bg: #FFFFFF;
+    --clr-header: #1A0F0A;
+    --clr-accent: #8B2500;
+    --clr-accent2: #C75B39;
+    --clr-accent3: #D4A574;
+    --clr-gold: #B8860B;
+    --clr-text: #2C1810;
+    --clr-muted: #6B5B50;
+    --clr-card: #FFFFFF;
+    --clr-border: #D4C5B5;
+    --clr-highlight: #FFF8F0;
+    --clr-technique-detache: #C75B39;
+    --clr-technique-flageolet: #2E7D6F;
+    --clr-technique-spiccato: #4A6FA5;
+    --clr-technique-pizzicato: #8B6914;
+    --font-display: 'Playfair Display', Georgia, serif;
+    --font-body: 'Source Sans 3', 'Source Sans Pro', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --poster-w: 4494px;  /* 1189mm at 96dpi ≈ 4494px */
+    --poster-h: 3180px;  /* 841mm at 96dpi ≈ 3180px */
+  }
+
+  @page {
+    size: 1189mm 841mm landscape;
+    margin: 0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #333;
+    font-family: var(--font-body);
+    color: var(--clr-text);
+    min-height: 100vh;
+  }
+
+  /* ───── TOOLBAR ───── */
+  .toolbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    background: var(--clr-header);
+    color: white;
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 2000;
+    font-family: var(--font-body);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    font-size: 14px;
+  }
+  .toolbar-info { opacity: 0.8; }
+  .toolbar-actions { display: flex; gap: 14px; align-items: center; }
+  .toolbar label { display: flex; align-items: center; gap: 6px; }
+  .toolbar input[type="range"] { width: 140px; accent-color: var(--clr-accent2); }
+  .print-btn {
+    background: var(--clr-accent);
+    color: white;
+    border: none;
+    padding: 8px 22px;
+    font-size: 14px;
+    font-family: var(--font-body);
+    font-weight: 700;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .print-btn:hover { background: var(--clr-accent2); }
+
+  /* ───── POSTER WRAPPER (screen) ───── */
+  .poster-wrapper {
+    padding-top: 52px;
+    display: flex;
+    justify-content: center;
+    padding-bottom: 20px;
+  }
+
+  .poster {
+    width: var(--poster-w);
+    height: var(--poster-h);
+    background: var(--clr-bg);
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    padding: 68px 83px 53px;
+    gap: 38px;
+    position: relative;
+    transform-origin: top center;
+    flex-shrink: 0;
+    font-size: 22pt;
+    line-height: 1.45;
+    overflow: hidden;
+  }
+
+  .poster::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 30px;
+    background: linear-gradient(90deg, var(--clr-accent), var(--clr-accent2) 40%, var(--clr-accent3) 70%, var(--clr-gold));
+  }
+
+  /* ───── HEADER ───── */
+  .header {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 40px;
+    padding-bottom: 23px;
+    border-bottom: 2px solid var(--clr-border);
+  }
+
+  .header-logo {
+    flex-shrink: 0;
+  }
+
+  .header-logo img {
+    height: 180px;
+    width: auto;
+    display: block;
+  }
+
+  .header-text h1 {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: 68px;
+    color: var(--clr-header);
+    letter-spacing: -0.5px;
+    line-height: 1.15;
+    margin-bottom: 12px;
+  }
+
+  .authors {
+    font-size: 42px;
+    font-weight: 600;
+    color: var(--clr-text);
+    margin-bottom: 6px;
+  }
+
+  .affiliations {
+    font-size: 20px;
+    color: var(--clr-muted);
+    line-height: 1.5;
+  }
+  .affiliations sup { font-size: 13px; }
+
+  .header-right {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 25px;
+    flex-shrink: 0;
+  }
+
+  .header-right img {
+    height: 120px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+  }
+
+
+  /* ───── MAIN CONTENT ───── */
+  .content {
+    display: grid;
+    grid-template-columns: 1fr 1.25fr 1fr;
+    gap: 45px;
+    overflow: hidden;
+  }
+
+  .column { display: flex; flex-direction: column; gap: 30px; }
+
+  /* ───── CARDS ───── */
+  .card {
+    background: var(--clr-card);
+    border-radius: 15px;
+    padding: 30px 34px;
+    border: 1px solid var(--clr-border);
+    box-shadow: 0 8px 23px rgba(0,0,0,0.04);
+    flex: 1 0 auto;
+  }
+
+  .card h2 {
+    font-family: var(--font-display);
+    font-size: 34px;
+    font-weight: 700;
+    color: var(--clr-accent);
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 3px solid var(--clr-accent3);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .card h2 .section-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    background: var(--clr-accent);
+    color: white;
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 22px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .card h3 {
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--clr-header);
+    margin: 15px 0 8px;
+  }
+
+  .card p, .card li {
+    font-size: 23px;
+    line-height: 1.5;
+    color: var(--clr-text);
+  }
+
+  .card ul { padding-left: 23px; margin: 8px 0; }
+  .card li { margin-bottom: 6px; }
+
+  .card .highlight {
+    background: var(--clr-highlight);
+    border-left: 4px solid var(--clr-accent2);
+    padding: 12px 19px;
+    border-radius: 0 8px 8px 0;
+    margin: 12px 0;
+    font-size: 22px;
+  }
+
+  .card .highlight strong { color: var(--clr-accent); }
+
+  /* ───── TABLES ───── */
+  .table-wrap { overflow-x: auto; margin: 11px 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 18px; }
+
+  table th {
+    background: var(--clr-header);
+    color: white;
+    padding: 10px 11px;
+    font-weight: 700;
+    text-align: center;
+    font-size: 17px;
+  }
+
+  table th:first-child { text-align: left; border-radius: 8px 0 0 0; }
+  table th:last-child { border-radius: 0 8px 0 0; }
+
+  table td {
+    padding: 8px 11px;
+    text-align: center;
+    border-bottom: 1px solid var(--clr-border);
+    font-size: 18px;
+    font-family: var(--font-mono);
+  }
+
+  table td:first-child {
+    text-align: left;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 18px;
+  }
+
+  table tr:nth-child(even) { background: #FAFAF7; }
+
+  .best { font-weight: 700; color: var(--clr-accent); }
+  .second { text-decoration: underline; text-decoration-color: var(--clr-accent3); }
+  .std { font-size: 0.8em; opacity: 0.6; }
+
+  /* ───── CONFUSION MATRIX ───── */
+  .confusion-matrix {
+    display: grid;
+    grid-template-columns: auto repeat(4, 1fr);
+    grid-template-rows: auto repeat(4, 1fr);
+    gap: 6px;
+    margin: 11px auto;
+    width: 85%;
+  }
+
+  .cm-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--clr-muted);
+    padding: 6px;
+  }
+
+  .cm-label.row-label {
+    text-align: right;
+    padding-right: 8px;
+    justify-content: flex-end;
+  }
+
+  .cm-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 11px 8px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    font-size: 20px;
+    min-height: 53px;
+  }
+
+  /* ───── FIGURE IMAGES ───── */
+  .card img {
+    display: block;
+    margin: 0 auto;
+  }
+
+  /* ───── TECHNIQUE PILLS ───── */
+  .technique-pills { display: flex; gap: 11px; margin: 11px 0; flex-wrap: wrap; }
+
+  .technique-pill {
+    padding: 8px 19px;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: 600;
+    color: white;
+  }
+
+  .pill-detache { background: var(--clr-technique-detache); }
+  .pill-flageolet { background: var(--clr-technique-flageolet); }
+  .pill-spiccato { background: var(--clr-technique-spiccato); }
+  .pill-pizzicato { background: var(--clr-technique-pizzicato); }
+
+  /* ───── FOOTER ───── */
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 15px;
+    border-top: 2px solid var(--clr-border);
+    font-size: 18px;
+    color: var(--clr-muted);
+  }
+
+  .footer a { color: var(--clr-accent); text-decoration: none; font-weight: 600; }
+  .footer .contact { font-family: var(--font-mono); font-size: 17px; }
+
+  /* ───── EQUATION ───── */
+  .equation {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    background: var(--clr-highlight);
+    padding: 11px 19px;
+    border-radius: 8px;
+    margin: 11px 0;
+    text-align: center;
+    color: var(--clr-header);
+  }
+
+  /* ───── Key findings box ───── */
+  .findings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 11px;
+    margin: 11px 0;
+  }
+
+  .finding-item {
+    background: var(--clr-highlight);
+    border-radius: 8px;
+    padding: 11px 15px;
+    border-left: 4px solid var(--clr-accent2);
+    font-size: 20px;
+  }
+
+  .finding-item strong {
+    color: var(--clr-accent);
+    font-size: 26px;
+    display: block;
+    margin-bottom: 4px;
+    font-family: var(--font-mono);
+  }
+
+  /* ───── PRINT ───── */
+  @media print {
+    .toolbar { display: none !important; }
+    .poster-wrapper { padding-top: 0; padding-bottom: 0; }
+    body { background: white; }
+    .poster {
+      transform: none !important;
+      width: 1189mm;
+      height: 841mm;
+      margin: 0;
+    }
+    html, body {
+      width: 1189mm;
+      height: 841mm;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="toolbar-info">VioPTT — ICASSP 2026 Poster</span>
+  <div class="toolbar-actions">
+    <label>Zoom: <input type="range" id="zoomSlider" min="10" max="100" value="25"> <span id="zoomValue">25%</span></label>
+    <button class="print-btn" onclick="window.print()">Print / Save PDF</button>
+  </div>
+</div>
+
+<div class="poster-wrapper">
+<div class="poster" id="poster">
+  <header class="header">
+    <div class="header-logo">
+      <img src="assets/icassp-logo.png" alt="ICASSP 2026 Barcelona">
+    </div>
+    <div class="header-text">
+      <h1>VioPTT: Violin Playing Technique-Aware Transcription from Synthetic Data Augmentation</h1>
+      <p class="authors">
+        Ting-Kang Wang<sup>★ 2,3,1</sup> &nbsp;&bull;&nbsp;
+        Yueh-Po Peng<sup>★ 4,1</sup> &nbsp;&bull;&nbsp;
+        Li Su<sup>2</sup> &nbsp;&bull;&nbsp;
+        Vincent K.M. Cheung<sup>1</sup>
+      </p>
+      <p class="affiliations">
+        <sup>1</sup> Sony Computer Science Laboratories, Inc., Tokyo, Japan &nbsp;
+        <sup>2</sup> Institute of Information Science, Academia Sinica, Taipei, Taiwan<br>
+        <sup>3</sup> Graduate Institute of Communication Engineering, National Taiwan University, Taiwan &nbsp;
+        <sup>4</sup> Original Content Center, Gamania Inc., Taipei, Taiwan<br>
+        <sup>★</sup> Equal contribution; Work done during internship at Sony CSL.
+      </p>
+    </div>
+    <div class="header-right">
+      <img src="assets/logo-sonycsl.png" alt="Sony CSL">
+      <img src="assets/logo-iis.png" alt="IIS, Academia Sinica">
+      <img src="assets/logo-ntu.png" alt="National Taiwan University">
+      <img src="assets/logo-gamania.png" alt="Gamania">
+    </div>
+  </header>
+
+  <main class="content">
+    <!-- ━━━━━ COLUMN 1 ━━━━━ -->
+    <div class="column">
+      <div class="card">
+        <h2><span class="section-num">1</span> Motivation</h2>
+        <p>Automatic music transcription (AMT) has achieved substantial progress, yet most systems only capture <strong>pitch and timing</strong>, overlooking expressive, instrument-specific nuances.</p>
+        <div class="highlight">
+          <strong>The Gap:</strong> Violin playing technique—integral to its timbral palette—remains largely unexplored in transcription due to the cost and expertise required for annotation.
+        </div>
+        <p style="margin-top:12px;">We propose <strong>VioPTT</strong>, the <em>first</em> model to jointly transcribe violin pitch, onset, offset, <strong>and</strong> playing technique within a unified framework.</p>
+      </div>
+
+      <div class="card">
+        <h2><span class="section-num">2</span> Key Contributions</h2>
+        <ul>
+          <li><strong>Lightweight cascade architecture</strong> combining a transcription module with an articulation module for joint note + technique prediction</li>
+          <li><strong>MOSA-VPT</strong>: a novel 76-hour synthetic violin technique dataset eliminating the need for manual annotation</li>
+          <li><strong>State-of-the-art transcription</strong> without pretrained representations from other instruments</li>
+          <li><strong>Strong generalization</strong> from synthetic training data to real-world violin technique recognition</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2><span class="section-num">3</span> Model Architecture</h2>
+        <div style="text-align:center; margin:8px 0;">
+          <img src="assets/vioptt-architecture.png" alt="VioPTT Model Architecture" style="width:100%; max-width:100%; border-radius:8px;">
+        </div>
+        <p style="font-size:17px; color:var(--clr-muted); text-align:center; margin-top:4px;">Fig. 1: Overview of our technique-aware violin transcription model.</p>
+        <h3>Training Objective</h3>
+        <div class="equation">
+          ℒ = ℒ<sub>onset</sub>(BCE) + ℒ<sub>offset</sub>(BCE) + ℒ<sub>frame</sub>(BCE) + ℒ<sub>velocity</sub>(MSE) + ℒ<sub>technique</sub>(CCE)
+        </div>
+      </div>
+    </div>
+
+    <!-- ━━━━━ COLUMN 2 ━━━━━ -->
+    <div class="column">
+      <div class="card">
+        <h2><span class="section-num">4</span> Data &amp; Augmentation</h2>
+        <h3>Datasets</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:11px; margin:8px 0;">
+          <div style="background:var(--clr-highlight); border-radius:8px; padding:11px 15px;">
+            <strong style="color:var(--clr-accent); font-size:20px;">MOSA</strong> <span style="font-size:17px;">(Training)</span><br>
+            <span style="font-size:20px;">19 hrs solo violin · 15 expert players · Note-level annotations with pitch, rhythm, dynamics &amp; articulation</span>
+          </div>
+          <div style="background:var(--clr-highlight); border-radius:8px; padding:11px 15px;">
+            <strong style="color:var(--clr-accent); font-size:20px;">MOSA-VPT</strong> <span style="font-size:17px;">(Ours — Synthetic)</span><br>
+            <span style="font-size:20px;">76 hrs audio-MIDI pairs · 4 techniques balanced · Rendered via DAWDreamer + Synchron Solo Violin I</span>
+          </div>
+          <div style="background:#f0f0ec; border-radius:8px; padding:11px 15px;">
+            <strong style="font-size:20px;">URMP</strong> / <strong style="font-size:20px;">Bach10</strong> <span style="font-size:17px;">(Test — Transcription)</span><br>
+            <span style="font-size:20px;">44 chamber pieces + 10 four-part chorales with annotated pitch and timing</span>
+          </div>
+          <div style="background:#f0f0ec; border-radius:8px; padding:11px 15px;">
+            <strong style="font-size:20px;">RWC</strong> <span style="font-size:17px;">(Test — Technique)</span><br>
+            <span style="font-size:20px;">Real-world chromatic scales with multiple dynamics and playing styles</span>
+          </div>
+        </div>
+
+        <h3>Technique Synthesis Pipeline</h3>
+        <div class="technique-pills">
+          <span class="technique-pill pill-detache">Détaché</span>
+          <span class="technique-pill pill-flageolet">Flageolet</span>
+          <span class="technique-pill pill-spiccato">Spiccato</span>
+          <span class="technique-pill pill-pizzicato">Pizzicato</span>
+        </div>
+        <p style="font-size:20px;">MIDI scores → DAWDreamer (VST host) → Synchron Solo Violin I → key-switch + CC control → mono 16 kHz stems. Fully annotation-free and generalizable to any VST instrument.</p>
+
+        <h3>Pitch &amp; Timing Augmentation</h3>
+        <p style="font-size:20px;">Pitch shift (±0.1 st) · +5 dB gain · 2× random band-pass (32–4096 Hz) · Reverb (room 0.35)</p>
+      </div>
+
+      <div class="card">
+        <h2><span class="section-num">5</span> Transcription Results</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="min-width:200px;">Model</th>
+                <th colspan="4" style="border-bottom:3px solid var(--clr-accent3);">URMP</th>
+                <th colspan="4" style="border-bottom:3px solid var(--clr-technique-flageolet);">Bach10</th>
+              </tr>
+              <tr>
+                <th></th><th>P</th><th>R</th><th>F1</th><th>F1<sub>no</sub></th><th>P</th><th>R</th><th>F1</th><th>F1<sub>no</sub></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Ours w/o aug</td><td>83.4</td><td>81.2</td><td>82.2</td><td>92.8</td><td>66.7</td><td>71.3</td><td>68.9</td><td>79.0</td></tr>
+              <tr><td>Ours w/ aug</td><td class="second">86.1</td><td class="best">83.6</td><td class="second">84.5</td><td class="best">93.1</td><td class="second">68.1</td><td class="second">71.8</td><td class="second">69.9</td><td class="second">79.5</td></tr>
+              <tr><td>Ours + FT w/o aug</td><td>84.4</td><td>79.0</td><td>81.3</td><td>91.3</td><td class="best">69.5</td><td class="best">73.7</td><td class="best">71.5</td><td class="best">80.2</td></tr>
+              <tr><td>Ours + FT w/ aug</td><td>85.0</td><td>82.1</td><td>83.3</td><td>92.9</td><td>63.3</td><td>68.4</td><td>65.7</td><td>77.8</td></tr>
+              <tr><td>MUSC [Tamer '24]</td><td class="best">86.5</td><td class="second">83.1</td><td class="best">84.6</td><td class="second">93.0</td><td>65.0</td><td>64.8</td><td>64.8</td><td>77.0</td></tr>
+              <tr><td>MERTech [Chen '24]</td><td>26.6</td><td>33.7</td><td>29.8</td><td>30.3</td><td>27.6</td><td>53.4</td><td>36.4</td><td>36.9</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:17px; color:var(--clr-muted); margin-top:8px;">"FT" = fine-tuned from piano-pretrained checkpoint · "aug" = augmentation · <span class="best" style="font-size:17px;">Bold</span> = best · <span class="second" style="font-size:17px;">Underlined</span> = second-best</p>
+        <div class="highlight" style="margin-top:12px;">
+          <strong>Key insight:</strong> State-of-the-art performance achieved from scratch with augmentation and ~30% less data than MUSC — transfer learning gains are limited when sufficient domain-specific data are available.
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="section-num">6</span> Technique Classification Results</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Ablation</th><th>Macro Acc (%)</th><th>Flageolet (%)</th><th>Détaché (%)</th><th>Pizzicato (%)</th><th>Spiccato (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Full ablation</td><td class="second">70.46 <span class="std">±2.57</span></td><td>86.44 <span class="std">±4.19</span></td><td>51.75 <span class="std">±9.97</span></td><td>57.06 <span class="std">±15.33</span></td><td class="best">86.56 <span class="std">±2.55</span></td></tr>
+              <tr><td>Frame excl.</td><td>66.21 <span class="std">±13.24</span></td><td>71.79 <span class="std">±16.53</span></td><td class="best">70.16 <span class="std">±32.58</span></td><td>63.80 <span class="std">±38.66</span></td><td>59.10 <span class="std">±19.71</span></td></tr>
+              <tr><td>Offset excl.</td><td>59.71 <span class="std">±10.19</span></td><td>72.80 <span class="std">±27.65</span></td><td>55.41 <span class="std">±24.71</span></td><td>52.75 <span class="std">±45.82</span></td><td>57.85 <span class="std">±24.79</span></td></tr>
+              <tr><td>Onset excl.</td><td>65.82 <span class="std">±8.63</span></td><td class="second">91.55 <span class="std">±1.96</span></td><td>51.94 <span class="std">±19.77</span></td><td class="second">65.47 <span class="std">±20.35</span></td><td>54.34 <span class="std">±11.90</span></td></tr>
+              <tr><td>Velocity excl.</td><td>55.59 <span class="std">±3.55</span></td><td>77.07 <span class="std">±22.73</span></td><td class="second">65.67 <span class="std">±26.70</span></td><td>0.16 <span class="std">±0.28</span></td><td>79.45 <span class="std">±2.81</span></td></tr>
+              <tr><td><strong>No ablation</strong></td><td class="best">77.22 <span class="std">±6.35</span></td><td>71.89 <span class="std">±14.12</span></td><td>63.12 <span class="std">±12.59</span></td><td class="best">88.80 <span class="std">±3.11</span></td><td class="second">85.08 <span class="std">±4.87</span></td></tr>
+              <tr><td><em>MERTech</em> [16]</td><td>53.36 <span class="std">±1.02</span></td><td class="best">95.77 <span class="std">±2.23</span></td><td>58.80 <span class="std">±1.63</span></td><td>43.27 <span class="std">±1.19</span></td><td>15.61 <span class="std">±2.06</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:17px; color:var(--clr-muted); margin-top:8px;">Mean ± std from 3 random data splits on RWC dataset. <span class="best" style="font-size:17px;">Bold</span> = best, <span class="second" style="font-size:17px;">Underlined</span> = second-best per column.</p>
+      </div>
+    </div>
+
+    <!-- ━━━━━ COLUMN 3 ━━━━━ -->
+    <div class="column">
+      <div class="card">
+        <h2><span class="section-num">7</span> Confusion Matrix</h2>
+        <p style="font-size:18px; margin-bottom:8px; text-align:center; color:var(--clr-muted);">Predictions aggregated across all folds</p>
+        <div class="confusion-matrix">
+          <div class="cm-corner"></div>
+          <div class="cm-label" style="font-size:15px;">Flag.</div>
+          <div class="cm-label" style="font-size:15px;">Dét.</div>
+          <div class="cm-label" style="font-size:15px;">Pizz.</div>
+          <div class="cm-label" style="font-size:15px;">Spic.</div>
+
+          <div class="cm-label row-label">Flag.</div>
+          <div class="cm-cell" style="background:rgba(46,125,111,0.75); color:white;">72%</div>
+          <div class="cm-cell" style="background:rgba(46,125,111,0.15);">13%</div>
+          <div class="cm-cell" style="background:rgba(46,125,111,0.08);">7%</div>
+          <div class="cm-cell" style="background:rgba(46,125,111,0.10);">8%</div>
+
+          <div class="cm-label row-label">Dét.</div>
+          <div class="cm-cell" style="background:rgba(199,91,57,0.12);">9%</div>
+          <div class="cm-cell" style="background:rgba(199,91,57,0.60); color:white;">63%</div>
+          <div class="cm-cell" style="background:rgba(199,91,57,0.05);">3%</div>
+          <div class="cm-cell" style="background:rgba(199,91,57,0.25);">25%</div>
+
+          <div class="cm-label row-label">Pizz.</div>
+          <div class="cm-cell" style="background:rgba(139,105,20,0.05);">2%</div>
+          <div class="cm-cell" style="background:rgba(139,105,20,0.06);">4%</div>
+          <div class="cm-cell" style="background:rgba(139,105,20,0.85); color:white;">89%</div>
+          <div class="cm-cell" style="background:rgba(139,105,20,0.05);">5%</div>
+
+          <div class="cm-label row-label">Spic.</div>
+          <div class="cm-cell" style="background:rgba(74,111,165,0.04);">2%</div>
+          <div class="cm-cell" style="background:rgba(74,111,165,0.10);">8%</div>
+          <div class="cm-cell" style="background:rgba(74,111,165,0.05);">5%</div>
+          <div class="cm-cell" style="background:rgba(74,111,165,0.82); color:white;">85%</div>
+        </div>
+        <p style="font-size:16px; text-align:center; color:var(--clr-muted); margin-top:4px;">← Predicted →&emsp;&emsp;↑ True ↑</p>
+        <div class="highlight" style="margin-top:8px; font-size:18px;">
+          <strong>Pizzicato</strong> shows minimal misclassification (distinct acoustic character). <strong>Détaché</strong> is most confused with <strong>spiccato</strong> (both use short bow strokes).
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="section-num">8</span> UMAP Embedding Visualization</h2>
+        <div style="text-align:center; margin:8px 0;">
+          <img src="assets/vioptt-umap.png" alt="UMAP of Note-Level Technique Embeddings" style="width:100%; max-width:100%; border-radius:8px; background:white;">
+        </div>
+        <p style="font-size:17px; color:var(--clr-muted); margin-top:4px;">Fig. 3: UMAP visualization of RWC data on learned note-level embeddings. Despite training on synthetic data only, learned representations generalize to unseen real-world recordings with clear class separation.</p>
+      </div>
+
+      <div class="card">
+        <h2><span class="section-num">9</span> Conclusions &amp; Future Work</h2>
+        <div class="findings-grid">
+          <div class="finding-item">
+            <strong>93.1</strong>
+            F1<sub>no</sub> on URMP — matching SOTA with ~30% less data
+          </div>
+          <div class="finding-item">
+            <strong>77.2%</strong>
+            Macro accuracy on real-world technique classification
+          </div>
+          <div class="finding-item">
+            <strong>76 hrs</strong>
+            Synthetic technique data — no expert annotation needed
+          </div>
+          <div class="finding-item">
+            <strong>1st</strong>
+            Joint violin transcription + technique prediction model
+          </div>
+        </div>
+        <p style="margin-top:12px;"><strong>Future work:</strong> Extend synthesis framework to a broader range of techniques and other bowed string instruments (viola, cello, double bass).</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <span>Code &amp; Model: <a href="https://github.com/y10ab1/VioPTT">github.com/y10ab1/VioPTT</a> &nbsp;|&nbsp; Dataset: <a href="https://doi.org/10.5281/zenodo.18295471">doi.org/10.5281/zenodo.18295471</a></span>
+    <span class="contact">tim.tkwang@gmail.com &nbsp;·&nbsp; yabipeng@gamania.com &nbsp;·&nbsp; lisu@iis.sinica.edu.tw &nbsp;·&nbsp; cheung@csl.sony.co.jp</span>
+  </footer>
+</div>
+</div>
+
+<script>
+(function() {
+  var slider = document.getElementById('zoomSlider');
+  var label = document.getElementById('zoomValue');
+  var poster = document.getElementById('poster');
+  var wrapper = document.querySelector('.poster-wrapper');
+
+  function applyZoom(pct) {
+    var scale = pct / 100;
+    poster.style.transform = 'scale(' + scale + ')';
+    poster.style.transformOrigin = 'top center';
+    var scaledH = 3180 * scale;
+    wrapper.style.height = (scaledH + 72) + 'px';
+    label.textContent = pct + '%';
+  }
+
+  slider.oninput = function() { applyZoom(parseInt(this.value)); };
+  applyZoom(25);
+})();
+
+</script>
+
+</body>
+</html>
